@@ -171,7 +171,7 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     return { totalScore, verdict: 'rate', log };
   }
   
-  // Signal 1: Header Signal (50 pts)
+  // Signal 1: Header Signal (50 pts) - REQUIRED for rate card
   const headerResult = detectHeaderSignal(jsonData);
   log.headerSignal = headerResult;
   totalScore += headerResult.points;
@@ -180,7 +180,7 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     // Immediate classification as rate card
     log.totalScore = totalScore;
     log.verdict = 'rate';
-    log.reason = 'Channel code found in header (priority signal)';
+    log.reason = 'Channel code found in header (渠道代码/运输代码)';
     return {
       totalScore,
       verdict: 'rate',
@@ -190,32 +190,12 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     };
   }
   
-  // Signal 2: Column Mapping Signal (≤50 pts, base 30)
-  const columnResult = detectColumnSignal(jsonData);
-  log.columnSignal = columnResult;
-  totalScore += columnResult.points;
-  
-  // Signal 3: Weight-Range Signal (20 pts)
-  const weightResult = detectWeightSignal(jsonData);
-  log.weightSignal = weightResult;
-  totalScore += weightResult.points;
-  
-  // Decision logic
-  log.totalScore = totalScore;
-  
-  if (totalScore >= 60) {
-    log.verdict = 'rate';
-    log.reason = `Total score ${totalScore} ≥ 60 threshold`;
-    return { totalScore, verdict: 'rate', log };
-  } else if (columnResult.points >= 40 && weightResult.found) {
-    log.verdict = 'rate';
-    log.reason = 'Strong column mapping + weight range detected';
-    return { totalScore, verdict: 'rate', log };
-  } else {
-    log.verdict = 'uncertain';
-    log.reason = `Total score ${totalScore} < 60, requires manual annotation`;
-    return { totalScore, verdict: 'uncertain', log };
-  }
+  // If no header signal found, default to skipped (not a rate card)
+  // Only sheets with 渠道代码 or 运输代码 are considered rate cards
+  log.totalScore = 0;
+  log.verdict = 'skipped';
+  log.reason = 'No channel code (渠道代码) or transport code (运输代码) found - not a rate card';
+  return { totalScore: 0, verdict: 'skipped', log };
 };
 
 // Header signal detector (50 pts)
