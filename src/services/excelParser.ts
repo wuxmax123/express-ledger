@@ -211,8 +211,8 @@ const parseNumber = (value: any): number | undefined => {
   return isNaN(num) ? undefined : num;
 };
 
-// Sheet blacklist patterns
-const SHEET_BLACKLIST = /(报价总目录|目录国家维度|偏远|邮编|附加费|清单|服务|分区|说明|税率|HPRA|药事法|紧急|保价|签名)/;
+// Sheet blacklist patterns (exact specification)
+const SHEET_BLACKLIST = /(目录|总目录|国家维度|偏远|邮编|附加费|清单|服务|分区|说明|税率|紧急|保价|签名)/;
 
 // Sheet whitelist for YunExpress
 const YUNEXPRESS_WHITELIST = /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/;
@@ -291,19 +291,19 @@ const parseDirectorySheet = (workbook: XLSX.WorkBook): Map<string, { productName
   return directoryMap;
 };
 
-// Enhanced header detection with alias sets
+// Enhanced header detection with alias sets (case-insensitive matching)
 const COLUMN_ALIASES = {
-  country: ['国家/地区', '国家', '目的地', 'Country', 'Destination'],
-  zone: ['分区', '区域', '分区代码', 'Zone', 'Area'],
-  eta: ['参考时效', '时效', '派送时效', 'ETA', 'Delivery Time', '交货时间'],
-  weightRange: ['重量(KG)', '重量区间', '重量段', 'Weight', 'Weight Range', '重量范围'],
-  weightFrom: ['起重', 'From(kg)', '下限(kg)', 'Weight From', '起始重量'],
-  weightTo: ['至重', 'To(kg)', '上限(kg)', 'Weight To', '结束重量'],
-  minWeight: ['最低计费重(KG)', '最低计费重', '最低计费重量', 'Min Weight', 'Minimum Chargeable Weight', '最小计费重'],
-  price: ['运费(RMB/KG)', '运费(元/KG)', '价格', '运费', 'Rate', 'Price', '单价'],
-  registerFee: ['挂号费(RMB/票)', '挂号费', '处理费', 'Registration Fee', 'Handling Fee', '挂号费用'],
+  country: ['国家/地区', '国家', '目的地', 'Country', 'Destination', 'CountryCode', '国家代码'],
+  zone: ['分区', '区域', '分区代码', 'Zone'],
+  eta: ['参考时效', '时效', '派送时效', 'ETA'],
+  weightRange: ['重量(KG)', '重量区间', '重量段', 'Weight', 'Weight Range', '重量段(KG)'],
+  weightFrom: ['起重', 'From(kg)', '下限(kg)', '计费始重'],
+  weightTo: ['至重', 'To(kg)', '上限(kg)', '计费至重'],
+  minWeight: ['最低计费重(KG)', '最低计费重', '最低计费重量', '最小计费重量(KG)', '最小计费重量'],
+  price: ['运费(RMB/KG)', '运费(元/KG)', '价格', '单价', 'Price', '公斤运费(元/KG)', '公斤运费'],
+  registerFee: ['挂号费(RMB/票)', '挂号费', '处理费', 'Register Fee', '处理费(元/件)'],
   currency: ['币种', 'Currency'],
-  roundingStep: ['进位制(KG)', '进位制', '计费进位', 'Increment', 'Rounding']
+  roundingStep: ['进位制(KG)', '进位制', '计费进位']
 };
 
 // Check if a cell matches any alias in a set
@@ -772,12 +772,9 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     reason: ''
   };
   
-  // Check whitelist first - multiple vendor patterns
+  // Check whitelist first - multiple vendor patterns (exact specification)
   const whitelistPatterns = [
-    { pattern: /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/, vendor: 'YunExpress' },
-    { pattern: /(顺友).*(挂号|平邮|专线|大货)/, vendor: 'Sunyou' },
-    { pattern: /(4PX|递四方).*(挂号|平邮|专线)/, vendor: '4PX' },
-    { pattern: /(万邦).*(专线|挂号)/, vendor: 'Wanb' },
+    { pattern: /(云途|顺友|4PX|万邦|专线|挂号|平邮|大货|服装|化妆|全球)/, vendor: 'Multi-Vendor' },
     { pattern: /(燕文).*(追踪|惠选|大货|快线|快递|精品|服装|轻小件|挂号|平邮|专线|包裹|小包|全球|航空|经济|沃尔玛|Coupang|Aramex|BBC|化妆品)/, vendor: 'Yanwen' },
     { pattern: /(华南EMS|中邮|E特快|E邮宝).*(华南|深圳|上海)/, vendor: 'Yanwen' },
     { pattern: /(香港|大陆)(DHL|UPS|FEDEX)/, vendor: 'Yanwen' }
@@ -871,136 +868,56 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   return { totalScore: 0, verdict: 'skipped', confidence: 0, log };
 };
 
-// Header signal detector (50 pts) - Enhanced for merged cells and multi-line patterns
+// Header signal detector (50 pts) - Combined text block approach for robustness
 const detectHeaderSignal = (jsonData: any[][]): {
   found: boolean;
   channelCode?: string;
   effectiveDate?: string;
   points: number;
 } => {
-  // Multiple regex patterns for channel/transport code - enhanced patterns
-  const channelRegexes = [
-    /运输代码[:：\s]*([A-Za-z0-9\-]+)/,
-    /渠道代码[:：\s]*([A-Za-z0-9\-]+)/,
-    /Channel\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i,
-    /Transport\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i,
-    // Pattern for merged cells where label and value might be split
-    /^(运输代码|渠道代码|Channel Code|Transport Code)[:：\s]*$/i
-  ];
-  const codeOnlyPattern = /^([A-Z]{2}[A-Z0-9]{2,})$/; // Match code-only cells like "YE123"
-  const dateRegex = /(\d{4}[-\/]\d{2}[-\/]\d{2}\s*\d{2}:\d{2})/;
+  // Combine text from first 12 rows × 10 cols into a single text block
+  const maxRows = Math.min(12, jsonData.length);
+  const maxCols = 10;
+  let combinedText = '';
   
-  const maxRows = Math.min(15, jsonData.length);
-  
-  // First pass: look for complete patterns
   for (let r = 0; r < maxRows; r++) {
     const row = jsonData[r];
     if (!row) continue;
-    const maxCols = Math.min(10, row.length);
-    
-    for (let c = 0; c < maxCols; c++) {
+    for (let c = 0; c < Math.min(maxCols, row.length); c++) {
       const cell = row[c];
-      if (typeof cell === 'string') {
-        const normalized = normalizeText(cell);
-        
-        // Try all channel code patterns
-        for (const channelRegex of channelRegexes.slice(0, 4)) { // First 4 are complete patterns
-          const channelMatch = normalized.match(channelRegex);
-          if (channelMatch && channelMatch[1]) {
-            const extractedCode = channelMatch[1].trim().toUpperCase();
-            
-            // Ensure channel code is valid format (2+ letters + digits)
-            if (extractedCode.length >= 4 && /^[A-Z]{2}[A-Z0-9]+$/.test(extractedCode)) {
-              // Look for date in same cell or nearby cells
-              let effectiveDate: string | undefined;
-              const dateMatch = normalized.match(dateRegex);
-              if (dateMatch) {
-                effectiveDate = dateMatch[1].replace('/', '-');
-              } else {
-                // Check adjacent cells for date
-                for (let nc = Math.max(0, c - 2); nc < Math.min(maxCols, c + 3); nc++) {
-                  if (row[nc] && typeof row[nc] === 'string') {
-                    const dateM = normalizeText(row[nc]).match(dateRegex);
-                    if (dateM) {
-                      effectiveDate = dateM[1].replace('/', '-');
-                      break;
-                    }
-                  }
-                }
-              }
-              
-              return {
-                found: true,
-                channelCode: extractedCode,
-                effectiveDate,
-                points: 50
-              };
-            }
-          }
+      if (cell !== undefined && cell !== null) {
+        const cellText = String(cell).trim();
+        if (cellText) {
+          combinedText += cellText + ' ';
         }
       }
     }
+    combinedText += '\n';
   }
   
-  // Second pass: look for split patterns (label in one cell, code in next cell/row)
-  for (let r = 0; r < maxRows; r++) {
-    const row = jsonData[r];
-    if (!row) continue;
-    const maxCols = Math.min(10, row.length);
+  // Normalize the combined text
+  const normalized = normalizeText(combinedText);
+  
+  // Search for channel code with regex (combined pattern for all variants)
+  const channelCodeRegex = /(?:运输代码|渠道代码|产品编码|Channel Code|Product Code)[:：\s]*([A-Za-z0-9\-_/]+)/i;
+  const channelMatch = normalized.match(channelCodeRegex);
+  
+  if (channelMatch && channelMatch[1]) {
+    const extractedCode = channelMatch[1].trim().toUpperCase();
     
-    for (let c = 0; c < maxCols; c++) {
-      const cell = row[c];
-      if (typeof cell === 'string') {
-        const normalized = normalizeText(cell);
-        
-        // Check if this cell contains label only (merged cell pattern)
-        if (channelRegexes[4].test(normalized)) {
-          // Look for code in adjacent cells (right, below, below-right)
-          const checkCells = [
-            { r, c: c + 1 },           // Right
-            { r, c: c + 2 },           // Two cells right
-            { r: r + 1, c },           // Below
-            { r: r + 1, c: c + 1 },    // Below-right
-            { r: r + 2, c }            // Two rows below
-          ];
-          
-          for (const pos of checkCells) {
-            if (pos.r < jsonData.length && jsonData[pos.r] && pos.c < jsonData[pos.r].length) {
-              const targetCell = jsonData[pos.r][pos.c];
-              if (typeof targetCell === 'string') {
-                const targetNorm = normalizeText(targetCell);
-                const codeMatch = targetNorm.match(codeOnlyPattern);
-                if (codeMatch && codeMatch[1]) {
-                  const extractedCode = codeMatch[1].toUpperCase();
-                  
-                  // Look for date nearby
-                  let effectiveDate: string | undefined;
-                  for (let nr = Math.max(0, r - 1); nr < Math.min(maxRows, r + 3); nr++) {
-                    if (!jsonData[nr]) continue;
-                    for (let nc = Math.max(0, c - 2); nc < Math.min(jsonData[nr].length, c + 5); nc++) {
-                      if (jsonData[nr][nc] && typeof jsonData[nr][nc] === 'string') {
-                        const dateM = normalizeText(jsonData[nr][nc]).match(dateRegex);
-                        if (dateM) {
-                          effectiveDate = dateM[1].replace('/', '-');
-                          break;
-                        }
-                      }
-                    }
-                    if (effectiveDate) break;
-                  }
-                  
-                  return {
-                    found: true,
-                    channelCode: extractedCode,
-                    effectiveDate,
-                    points: 50
-                  };
-                }
-              }
-            }
-          }
-        }
-      }
+    // Validate code format (at least 4 chars with letters/digits)
+    if (extractedCode.length >= 4) {
+      // Look for effective date in the same text block
+      const dateRegex = /(?:生效日期|有效期|Effective Date)[:：\s]*(\d{4}[/-]\d{1,2}[/-]\d{1,2})/i;
+      const dateMatch = normalized.match(dateRegex);
+      const effectiveDate = dateMatch ? dateMatch[1].replace('/', '-') : undefined;
+      
+      return {
+        found: true,
+        channelCode: extractedCode,
+        effectiveDate,
+        points: 50
+      };
     }
   }
   
