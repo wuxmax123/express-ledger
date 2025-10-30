@@ -1,26 +1,41 @@
-import { Card, Select, Descriptions, Table, Tag } from 'antd';
+import { Card, Select, Descriptions, Table, Tag, Tabs } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 
 const RateHistory = () => {
   const { t } = useTranslation();
   const { channelId } = useParams();
+  const navigate = useNavigate();
+  const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>(
+    channelId ? [Number(channelId)] : []
+  );
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
     queryFn: () => api.getChannels()
   });
 
-  const { data: versions } = useQuery({
-    queryKey: ['channel-versions', channelId],
-    queryFn: () => api.getChannelVersions(Number(channelId)),
-    enabled: !!channelId
-  });
+  // Query versions for all selected channels
+  const versionQueries = selectedChannelIds.map(id => 
+    useQuery({
+      queryKey: ['channel-versions', id],
+      queryFn: () => api.getChannelVersions(id),
+      enabled: !!id
+    })
+  );
 
-  const currentVersion = versions?.find(v => v.status === 'active');
+  const handleChannelChange = (ids: number[]) => {
+    setSelectedChannelIds(ids);
+    if (ids.length === 1) {
+      navigate(`/rates/history/${ids[0]}`);
+    } else if (ids.length > 1) {
+      navigate(`/rates/history/${ids[0]}`); // Navigate to first selected
+    }
+  };
 
   const columns = [
     {
@@ -63,52 +78,81 @@ const RateHistory = () => {
       <Card className="mb-6">
         <div className="mb-4">
           <label className="block mb-2 font-medium text-foreground">
-            {t('nav.channels')}
+            {t('nav.channels')} (支持多选)
           </label>
           <Select
-            className="w-full max-w-md"
-            placeholder="Select Channel"
-            value={Number(channelId)}
+            mode="multiple"
+            className="w-full"
+            placeholder="Select Channels"
+            value={selectedChannelIds}
+            onChange={handleChannelChange}
             options={channels?.map(c => ({ label: c.name, value: c.id }))}
+            maxTagCount="responsive"
           />
         </div>
-
-        {currentVersion && (
-          <>
-            <div className="mb-4 font-medium text-lg text-foreground">
-              {t('history.currentVersion')}
-            </div>
-            <Descriptions bordered column={2}>
-              <Descriptions.Item label="Version">
-                {currentVersion.versionCode}
-              </Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color="green">{currentVersion.status}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Effective Date">
-                {dayjs(currentVersion.effectiveDate).format('YYYY-MM-DD')}
-              </Descriptions.Item>
-              <Descriptions.Item label="Uploaded By">
-                {currentVersion.uploadedBy}
-              </Descriptions.Item>
-              <Descriptions.Item label="File Name" span={2}>
-                {currentVersion.fileName}
-              </Descriptions.Item>
-            </Descriptions>
-          </>
-        )}
       </Card>
 
-      <Card>
-        <div className="mb-4 font-medium text-lg text-foreground">
-          All Versions
-        </div>
-        <Table
-          columns={columns}
-          dataSource={versions?.map((v, i) => ({ ...v, key: i }))}
-          pagination={false}
+      {selectedChannelIds.length > 0 && (
+        <Tabs
+          items={selectedChannelIds.map((id, idx) => {
+            const channel = channels?.find(c => c.id === id);
+            const versions = versionQueries[idx]?.data || [];
+            const currentVersion = versions.find(v => v.status === 'active');
+
+            return {
+              key: String(id),
+              label: channel?.name || `Channel ${id}`,
+              children: (
+                <div>
+                  {currentVersion && (
+                    <Card className="mb-6">
+                      <div className="mb-4 font-medium text-lg text-foreground">
+                        {t('history.currentVersion')}
+                      </div>
+                      <Descriptions bordered column={2}>
+                        <Descriptions.Item label="Version">
+                          {currentVersion.versionCode}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Status">
+                          <Tag color="green">{currentVersion.status}</Tag>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Effective Date">
+                          {dayjs(currentVersion.effectiveDate).format('YYYY-MM-DD')}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Uploaded By">
+                          {currentVersion.uploadedBy}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="File Name" span={2}>
+                          {currentVersion.fileName}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Card>
+                  )}
+
+                  <Card>
+                    <div className="mb-4 font-medium text-lg text-foreground">
+                      All Versions
+                    </div>
+                    <Table
+                      columns={columns}
+                      dataSource={versions.map((v, i) => ({ ...v, key: i }))}
+                      pagination={{ pageSize: 10 }}
+                    />
+                  </Card>
+                </div>
+              )
+            };
+          })}
         />
-      </Card>
+      )}
+
+      {selectedChannelIds.length === 0 && (
+        <Card>
+          <div className="text-center py-8 text-muted-foreground">
+            请选择至少一个渠道以查看版本历史
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
