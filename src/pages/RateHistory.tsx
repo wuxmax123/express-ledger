@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const RateHistory = () => {
   const { t } = useTranslation();
@@ -14,26 +14,50 @@ const RateHistory = () => {
     channelId ? [Number(channelId)] : []
   );
 
+  // Update selected channels when URL param changes
+  useEffect(() => {
+    if (channelId) {
+      setSelectedChannelIds([Number(channelId)]);
+    }
+  }, [channelId]);
+
   const { data: channels } = useQuery({
     queryKey: ['channels'],
     queryFn: () => api.getChannels()
   });
 
-  // Query versions for all selected channels
-  const versionQueries = selectedChannelIds.map(id => 
-    useQuery({
-      queryKey: ['channel-versions', id],
-      queryFn: () => api.getChannelVersions(id),
-      enabled: !!id
-    })
-  );
+  // Fetch versions for all selected channels in a single query
+  const { data: allVersionsData } = useQuery({
+    queryKey: ['multi-channel-versions', selectedChannelIds],
+    queryFn: async () => {
+      if (selectedChannelIds.length === 0) return {};
+      
+      const results = await Promise.all(
+        selectedChannelIds.map(async (id) => {
+          try {
+            const versions = await api.getChannelVersions(id);
+            return { id, versions };
+          } catch (error) {
+            console.error(`Failed to fetch versions for channel ${id}:`, error);
+            return { id, versions: [] };
+          }
+        })
+      );
+      
+      return results.reduce((acc, { id, versions }) => {
+        acc[id] = versions;
+        return acc;
+      }, {} as Record<number, any[]>);
+    },
+    enabled: selectedChannelIds.length > 0
+  });
 
   const handleChannelChange = (ids: number[]) => {
     setSelectedChannelIds(ids);
     if (ids.length === 1) {
       navigate(`/rates/history/${ids[0]}`);
     } else if (ids.length > 1) {
-      navigate(`/rates/history/${ids[0]}`); // Navigate to first selected
+      navigate(`/rates/history/${ids[0]}`);
     }
   };
 
@@ -92,11 +116,11 @@ const RateHistory = () => {
         </div>
       </Card>
 
-      {selectedChannelIds.length > 0 && (
+      {selectedChannelIds.length > 0 && allVersionsData && (
         <Tabs
-          items={selectedChannelIds.map((id, idx) => {
+          items={selectedChannelIds.map((id) => {
             const channel = channels?.find(c => c.id === id);
-            const versions = versionQueries[idx]?.data || [];
+            const versions = allVersionsData[id] || [];
             const currentVersion = versions.find(v => v.status === 'active');
 
             return {
