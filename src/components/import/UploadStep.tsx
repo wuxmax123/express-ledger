@@ -29,7 +29,7 @@ export const UploadStep = () => {
 
       try {
         message.loading({ content: t('import.parsing'), key: 'parsing' });
-        const sheets = await parseExcelFile(file);
+        const sheets = await parseExcelFile(file, api.checkChannelHistory);
         setParsedSheets(sheets);
         message.success({ content: 'File parsed successfully', key: 'parsing' });
         setCurrentStep(1);

@@ -1,32 +1,48 @@
 import * as XLSX from 'xlsx';
 import { ParsedSheetData, StructureChangeLevel } from '@/types';
 
-export const parseExcelFile = async (file: File): Promise<ParsedSheetData[]> => {
+export const parseExcelFile = async (file: File, checkHistory: (channelCode: string) => Promise<boolean>): Promise<ParsedSheetData[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         
-        const sheets: ParsedSheetData[] = workbook.SheetNames.map((sheetName, index) => {
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
-          // Detect sheet type and simulate structure validation
-          const sheetType = detectSheetType(sheetName);
-          const structureChangeLevel = simulateStructureValidation(index);
-          
-          return {
-            sheetName,
-            sheetType,
-            rows: jsonData,
-            channelCode: extractChannelCode(sheetName),
-            structureChangeLevel,
-            structureChangeMessage: getStructureMessage(structureChangeLevel)
-          };
-        });
+        const sheets: ParsedSheetData[] = await Promise.all(
+          workbook.SheetNames.map(async (sheetName, index) => {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            // Detect sheet type
+            const sheetType = detectSheetType(sheetName);
+            const channelCode = extractChannelCode(sheetName);
+            
+            // Check if this channel has historical versions
+            const hasHistoricalVersion = await checkHistory(channelCode);
+            
+            // Only perform structure validation if there's a historical version
+            let structureChangeLevel: StructureChangeLevel | undefined;
+            let structureChangeMessage: string | undefined;
+            
+            if (hasHistoricalVersion) {
+              structureChangeLevel = simulateStructureValidation(index);
+              structureChangeMessage = getStructureMessage(structureChangeLevel);
+            }
+            
+            return {
+              sheetName,
+              sheetType,
+              rows: jsonData,
+              channelCode,
+              structureChangeLevel,
+              structureChangeMessage,
+              hasHistoricalVersion,
+              isFirstVersion: !hasHistoricalVersion
+            };
+          })
+        );
         
         resolve(sheets);
       } catch (error) {

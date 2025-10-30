@@ -8,6 +8,9 @@ export const StructureValidationStep = () => {
   const { t } = useTranslation();
   const { parsedSheets, setCurrentStep } = useImportStore();
 
+  // Filter out first versions - they don't need validation
+  const sheetsToValidate = parsedSheets.filter(s => !s.isFirstVersion);
+
   const getChangeIcon = (level: StructureChangeLevel) => {
     switch (level) {
       case 'NONE':
@@ -57,7 +60,7 @@ export const StructureValidationStep = () => {
     }
   ];
 
-  const hasMajorChanges = parsedSheets.some(s => s.structureChangeLevel === 'MAJOR');
+  const hasMajorChanges = sheetsToValidate.some(s => s.structureChangeLevel === 'MAJOR');
 
   return (
     <div className="space-y-6">
@@ -73,7 +76,7 @@ export const StructureValidationStep = () => {
       )}
 
       <Table
-        dataSource={parsedSheets.map((s, i) => ({ ...s, key: i }))}
+        dataSource={sheetsToValidate.map((s, i) => ({ ...s, key: i }))}
         columns={columns}
         pagination={false}
       />

@@ -107,4 +107,6 @@ export interface ParsedSheetData {
   effectiveDate?: string;
   structureChangeLevel?: StructureChangeLevel;
   structureChangeMessage?: string;
+  isFirstVersion?: boolean;
+  hasHistoricalVersion?: boolean;
 }

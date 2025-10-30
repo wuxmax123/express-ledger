@@ -64,6 +64,17 @@ export const api = {
     return client.post('/rate-imports', { file, vendorId });
   },
 
+  checkChannelHistory: async (channelCode: string): Promise<boolean> => {
+    // TODO: Replace with actual API call
+    // return client.get(`/channels/check-history?channelCode=${channelCode}`);
+    
+    // Mock: simulate some channels have history, some don't
+    // In real implementation, this should check database
+    await new Promise(resolve => setTimeout(resolve, 200));
+    // Return false for demo - meaning no historical versions exist
+    return false;
+  },
+
   getImportJobSheets: async (jobId: number) => {
     return client.get(`/rate-imports/${jobId}/sheets`);
   },
