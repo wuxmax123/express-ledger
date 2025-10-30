@@ -14,7 +14,7 @@
           "source": "cell_search",
           "row_range": [0, 12],
           "col_range": [0, 10],
-          "regex": "(?:运输代码|渠道代码|Channel Code|Product Code)[:：\\s]*([A-Za-z0-9\\-_/]+)"
+          "regex": "(?:渠道代码|运输代码|Channel Code|Product Code)[:：\\s]*([A-Za-z0-9\\-_/]+)"
         },
         "effective_date": {
           "source": "cell_search",
@@ -24,7 +24,8 @@
         }
       },
       "header_aliases": {
-        "country": ["国家/地区", "国家", "目的地", "Country", "Destination"],
+        "country": ["国家代码", "国家/地区", "国家", "目的地", "Country", "Destination", "Country Code"],
+        "channel_name": ["邮寄方式", "渠道名称", "Channel Name", "Product Name"],
         "zone": ["分区", "区域", "分区代码", "Zone"],
         "eta": ["参考时效", "时效", "派送时效", "ETA", "工作日"],
         "weight_range": ["重量(KG)", "重量区间", "重量段", "Weight", "Weight Range", "重量"],
@@ -32,8 +33,8 @@
         "weight_to": ["至重", "To(kg)", "上限(kg)", "计费至重"],
         "rounding_step": ["进位制(KG)", "进位制", "计费进位"],
         "min_chargeable_weight": ["最低计费重(KG)", "最低计费重", "最低计费重量"],
-        "price_per_kg": ["运费(RMB/KG)", "运费(元/KG)", "价格", "单价", "Price", "运费"],
-        "register_fee": ["挂号费(RMB/票)", "挂号费", "处理费", "Register Fee", "挂号费(RMB)"],
+        "price_per_kg": ["单价(元/kg)", "单价（元/kg）", "单价", "运费(RMB/KG)", "运费(元/KG)", "价格", "Price", "运费"],
+        "register_fee": ["处理费", "挂号费(RMB/票)", "挂号费", "Register Fee", "挂号费(RMB)", "Handling Fee"],
         "currency": ["币种", "Currency"]
       },
       "weight_patterns": [
