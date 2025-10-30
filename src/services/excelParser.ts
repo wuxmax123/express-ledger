@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { ParsedSheetData, StructureChangeLevel, DetectionVerdict, DetectionLog } from '@/types';
+import { ParsedSheetData, StructureChangeLevel, DetectionVerdict, DetectionLog, RateCardDetail } from '@/types';
 
 // Text normalization - enhanced for full-width characters
 const normalizeText = (text: string): string => {
@@ -99,6 +99,103 @@ const parseDirectorySheet = (workbook: XLSX.WorkBook): Map<string, { productName
   return directoryMap;
 };
 
+// Parse rate card details from sheet
+const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
+  const details: RateCardDetail[] = [];
+  
+  // Column mapping patterns
+  const columnPatterns = {
+    country: /(国家\/地区|国家|目的地|Country|Destination)/i,
+    zone: /(分区|区域|分区代码|Zone|Area)/i,
+    eta: /(参考时效|时效|派送时效|ETA|Delivery Time)/i,
+    weightRange: /(重量\(KG\)|重量区间|重量段|Weight|Weight Range)/i,
+    minWeight: /(最低计费重\(KG\)|最低计费重|最低计费重量|Min Weight|Minimum Chargeable Weight)/i,
+    rate: /(运费\(RMB\/KG\)|运费\(元\/KG\)|价格|运费|Rate|Price)/i,
+    registrationFee: /(挂号费\(RMB\/票\)|挂号费|处理费|Registration Fee|Handling Fee)/i,
+    increment: /(进位制\(KG\)|进位制|计费进位|Increment)/i
+  };
+  
+  // Find header row and column indices
+  let headerRowIndex = -1;
+  const columnIndices: Record<string, number> = {};
+  
+  const maxRows = Math.min(20, jsonData.length);
+  for (let r = 0; r < maxRows; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    
+    let matchCount = 0;
+    const tempIndices: Record<string, number> = {};
+    
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === 'string') {
+        const normalized = normalizeText(cell);
+        
+        for (const [key, pattern] of Object.entries(columnPatterns)) {
+          if (pattern.test(normalized)) {
+            tempIndices[key] = c;
+            matchCount++;
+          }
+        }
+      }
+    }
+    
+    // If we found at least 3 columns, consider this the header row
+    if (matchCount >= 3) {
+      headerRowIndex = r;
+      Object.assign(columnIndices, tempIndices);
+      break;
+    }
+  }
+  
+  // Extract data rows
+  if (headerRowIndex >= 0 && Object.keys(columnIndices).length >= 3) {
+    const dataStartRow = headerRowIndex + 1;
+    const maxDataRows = Math.min(100, jsonData.length); // Limit to first 100 data rows for preview
+    
+    for (let r = dataStartRow; r < maxDataRows; r++) {
+      const row = jsonData[r];
+      if (!row) continue;
+      
+      // Skip empty rows
+      const hasData = row.some(cell => cell !== undefined && cell !== null && cell !== '');
+      if (!hasData) continue;
+      
+      const detail: RateCardDetail = {};
+      
+      if (columnIndices.country !== undefined) {
+        detail.country = String(row[columnIndices.country] || '');
+      }
+      if (columnIndices.zone !== undefined) {
+        detail.zone = String(row[columnIndices.zone] || '');
+      }
+      if (columnIndices.eta !== undefined) {
+        detail.eta = String(row[columnIndices.eta] || '');
+      }
+      if (columnIndices.weightRange !== undefined) {
+        detail.weightRange = String(row[columnIndices.weightRange] || '');
+      }
+      if (columnIndices.minWeight !== undefined) {
+        detail.minChargeableWeight = String(row[columnIndices.minWeight] || '');
+      }
+      if (columnIndices.rate !== undefined) {
+        detail.rate = String(row[columnIndices.rate] || '');
+      }
+      if (columnIndices.registrationFee !== undefined) {
+        detail.registrationFee = String(row[columnIndices.registrationFee] || '');
+      }
+      
+      // Only add if at least country or weightRange exists
+      if (detail.country || detail.weightRange) {
+        details.push(detail);
+      }
+    }
+  }
+  
+  return details;
+};
+
 export const parseExcelFile = async (file: File, checkHistory: (channelCode: string) => Promise<boolean>): Promise<ParsedSheetData[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -175,6 +272,12 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
               sheetType = 'UNCERTAIN';
             }
             
+            // Parse rate card details if this is a rate card
+            let rateCardDetails: RateCardDetail[] | undefined;
+            if (detection.verdict === 'rate' || detection.verdict === 'uncertain') {
+              rateCardDetails = parseRateCardDetails(jsonData);
+            }
+            
             // Check if this channel has historical versions
             const hasHistoricalVersion = channelCode ? await checkHistory(channelCode) : false;
             
@@ -223,7 +326,8 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
               detectionScore: detection.totalScore,
               detectionVerdict: detection.verdict,
               detectionLog: detection.log,
-              action: detection.verdict === 'skipped' ? 'skip' : 'import'
+              action: detection.verdict === 'skipped' ? 'skip' : 'import',
+              rateCardDetails
             };
           })
         );

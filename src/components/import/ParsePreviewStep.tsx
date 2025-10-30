@@ -126,6 +126,35 @@ export const ParsePreviewStep = () => {
       </Form>
     );
   };
+  
+  const renderRateCardDetails = (record: ParsedSheetData) => {
+    if (!record.rateCardDetails || record.rateCardDetails.length === 0) {
+      return <div className="text-muted-foreground p-4">No rate card details available</div>;
+    }
+    
+    const detailColumns = [
+      { title: '国家/地区', dataIndex: 'country', key: 'country', width: 100 },
+      { title: '分区', dataIndex: 'zone', key: 'zone', width: 80 },
+      { title: '时效', dataIndex: 'eta', key: 'eta', width: 100 },
+      { title: '重量区间', dataIndex: 'weightRange', key: 'weightRange', width: 120 },
+      { title: '最低计费重', dataIndex: 'minChargeableWeight', key: 'minChargeableWeight', width: 120 },
+      { title: '运费', dataIndex: 'rate', key: 'rate', width: 100 },
+      { title: '挂号费', dataIndex: 'registrationFee', key: 'registrationFee', width: 100 }
+    ];
+    
+    return (
+      <div className="p-4">
+        <div className="mb-2 text-sm font-medium">Price Card Details ({record.rateCardDetails.length} rows)</div>
+        <Table
+          dataSource={record.rateCardDetails.map((d, i) => ({ ...d, key: i }))}
+          columns={detailColumns}
+          pagination={{ pageSize: 10, size: 'small' }}
+          size="small"
+          scroll={{ x: 800 }}
+        />
+      </div>
+    );
+  };
 
   const columns = [
     {
@@ -202,6 +231,20 @@ export const ParsePreviewStep = () => {
       dataIndex: 'rows',
       key: 'rows',
       render: (rows: any[]) => rows.length
+    },
+    {
+      title: 'Details',
+      key: 'details',
+      render: (_: any, record: ParsedSheetData) => {
+        if (record.rateCardDetails && record.rateCardDetails.length > 0) {
+          return (
+            <Button size="small" type="link">
+              View ({record.rateCardDetails.length} rows)
+            </Button>
+          );
+        }
+        return '-';
+      }
     }
   ];
 
@@ -261,10 +304,17 @@ export const ParsePreviewStep = () => {
             if (editingSheet === record.sheetName) {
               return renderManualAnnotationForm(record);
             }
+            if (record.rateCardDetails && record.rateCardDetails.length > 0) {
+              return renderRateCardDetails(record);
+            }
             return null;
           },
           expandedRowKeys: editingSheet ? [parsedSheets.findIndex(s => s.sheetName === editingSheet)] : [],
-          expandRowByClick: false
+          expandRowByClick: true,
+          rowExpandable: (record) => 
+            editingSheet === record.sheetName || 
+            (record.rateCardDetails && record.rateCardDetails.length > 0) ||
+            false
         }}
       />
       <div className="flex justify-between mt-6">

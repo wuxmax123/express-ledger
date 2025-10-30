@@ -110,6 +110,16 @@ export interface DetectionLog {
   reason: string;
 }
 
+export interface RateCardDetail {
+  country?: string;
+  zone?: string;
+  eta?: string; // 时效
+  weightRange?: string;
+  minChargeableWeight?: string;
+  rate?: string; // 运费
+  registrationFee?: string; // 挂号费
+}
+
 export interface ParsedSheetData {
   sheetName: string;
   sheetType: string;
@@ -129,4 +139,5 @@ export interface ParsedSheetData {
     channelCode?: string;
     effectiveDate?: string;
   };
+  rateCardDetails?: RateCardDetail[]; // Parsed rate card data
 }
