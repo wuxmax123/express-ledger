@@ -171,7 +171,23 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     return { totalScore, verdict: 'rate', log };
   }
   
-  // Signal 1: Header Signal (50 pts) - REQUIRED for rate card
+  // Try to extract channel code from sheet name first
+  // Pattern: uppercase letters + numbers (e.g., YTYCPREC, BKDDTK, THZXR)
+  const sheetNameCodeMatch = sheetName.match(/^([A-Z]{2,}[A-Z0-9]+)$/);
+  if (sheetNameCodeMatch && sheetNameCodeMatch[1].length >= 4) {
+    const extractedCode = sheetNameCodeMatch[1];
+    log.totalScore = 100;
+    log.verdict = 'rate';
+    log.reason = `Sheet name is a valid channel code: ${extractedCode}`;
+    return {
+      totalScore: 100,
+      verdict: 'rate',
+      channelCode: extractedCode,
+      log
+    };
+  }
+  
+  // Signal 1: Header Signal (50 pts) - check for "运输代码：" in content
   const headerResult = detectHeaderSignal(jsonData);
   log.headerSignal = headerResult;
   totalScore += headerResult.points;
