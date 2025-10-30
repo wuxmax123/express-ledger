@@ -68,11 +68,17 @@ export const api = {
     // TODO: Replace with actual API call
     // return client.get(`/channels/check-history?channelCode=${channelCode}`);
     
-    // Mock: simulate some channels have history, some don't
-    // In real implementation, this should check database
+    // Mock: simulate channels have history based on vendor patterns
+    // YunExpress (YE), 4PX, WanbExpress, Sunyou channels have history
     await new Promise(resolve => setTimeout(resolve, 200));
-    // Return false for demo - meaning no historical versions exist
-    return false;
+    
+    // Simulate that YE (云途) channels and some others have historical versions
+    const channelsWithHistory = ['YE001', 'YE002', 'YE003', '4PX001', 'WE001'];
+    const hasHistory = channelsWithHistory.includes(channelCode) || 
+                       channelCode.startsWith('YE') || 
+                       channelCode.startsWith('4PX');
+    
+    return hasHistory;
   },
 
   getImportJobSheets: async (jobId: number) => {
