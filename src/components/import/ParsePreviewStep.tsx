@@ -136,10 +136,33 @@ export const ParsePreviewStep = () => {
       { title: '国家/地区', dataIndex: 'country', key: 'country', width: 100 },
       { title: '分区', dataIndex: 'zone', key: 'zone', width: 80 },
       { title: '时效', dataIndex: 'eta', key: 'eta', width: 100 },
-      { title: '重量区间', dataIndex: 'weightRange', key: 'weightRange', width: 120 },
-      { title: '最低计费重', dataIndex: 'minChargeableWeight', key: 'minChargeableWeight', width: 120 },
-      { title: '运费', dataIndex: 'rate', key: 'rate', width: 100 },
-      { title: '挂号费', dataIndex: 'registrationFee', key: 'registrationFee', width: 100 }
+      { 
+        title: '重量区间', 
+        key: 'weightRange', 
+        width: 120,
+        render: (_: any, row: any) => row.weightRaw || `${row.weightFrom || '-'} - ${row.weightTo || '-'}`
+      },
+      { 
+        title: '最低计费重', 
+        dataIndex: 'minChargeableWeight', 
+        key: 'minChargeableWeight', 
+        width: 120,
+        render: (text: number) => text !== undefined ? `${text} kg` : '-'
+      },
+      { 
+        title: '运费', 
+        dataIndex: 'price', 
+        key: 'price', 
+        width: 100,
+        render: (text: number, row: any) => text !== undefined ? `${text} ${row.currency || 'RMB'}` : '-'
+      },
+      { 
+        title: '挂号费', 
+        dataIndex: 'registerFee', 
+        key: 'registerFee', 
+        width: 100,
+        render: (text: number, row: any) => text !== undefined ? `${text} ${row.currency || 'RMB'}` : '-'
+      }
     ];
     
     return (
@@ -152,6 +175,15 @@ export const ParsePreviewStep = () => {
           size="small"
           scroll={{ x: 800 }}
         />
+        
+        {record.notes && (
+          <div className="mt-4 border-t pt-4">
+            <div className="text-sm font-medium mb-2">备注:</div>
+            <div className="bg-muted p-3 rounded text-sm whitespace-pre-wrap text-muted-foreground">
+              {record.notes}
+            </div>
+          </div>
+        )}
       </div>
     );
   };

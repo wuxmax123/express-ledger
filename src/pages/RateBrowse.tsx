@@ -304,7 +304,7 @@ export default function RateBrowse() {
       >
         {selectedRow && (
           <div className="space-y-4">
-            <pre className="bg-muted p-4 rounded-lg overflow-auto">
+            <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
               {JSON.stringify(selectedRow, null, 2)}
             </pre>
           </div>

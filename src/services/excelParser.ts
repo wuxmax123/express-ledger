@@ -378,16 +378,106 @@ const isRepeatedHeader = (row: any[], columnMap: Map<string, number>): boolean =
   return headerMatches >= 3;
 };
 
+// Check if a row is a valid rate data row
+const isValidRateRow = (row: any[], columnMap: Map<string, number>): boolean => {
+  if (!row) return false;
+  
+  // Must have at least one valid field
+  const countryIdx = columnMap.get('country');
+  const priceIdx = columnMap.get('price');
+  const weightRangeIdx = columnMap.get('weightRange');
+  const weightFromIdx = columnMap.get('weightFrom');
+  
+  // Check country (must match known patterns or be a valid country code)
+  if (countryIdx !== undefined) {
+    const country = String(row[countryIdx] || '').trim();
+    if (country) {
+      const normalized = normalizeText(country).toLowerCase();
+      // Check if it's in our country dictionary or looks like a country code
+      if (COUNTRY_NORMALIZATION[normalized] || /^[A-Z]{2}$/i.test(country)) {
+        return true;
+      }
+    }
+  }
+  
+  // Check if weight is numeric or parseable
+  if (weightRangeIdx !== undefined) {
+    const weight = String(row[weightRangeIdx] || '').trim();
+    if (weight && parseWeightRange(weight)) {
+      return true;
+    }
+  }
+  
+  if (weightFromIdx !== undefined) {
+    const weightFrom = parseNumber(row[weightFromIdx]);
+    if (weightFrom !== undefined) {
+      return true;
+    }
+  }
+  
+  // Check if price is numeric
+  if (priceIdx !== undefined) {
+    const price = parseNumber(row[priceIdx]);
+    if (price !== undefined && price > 0) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+// Extract notes/remarks from rows after last valid data row
+const extractNotes = (jsonData: any[][], headerRowIndex: number, columnMap: Map<string, number>): string => {
+  const notes: string[] = [];
+  
+  // Find last valid data row
+  let lastValidRow = headerRowIndex;
+  for (let r = headerRowIndex + 1; r < jsonData.length; r++) {
+    const row = jsonData[r];
+    if (row && isValidRateRow(row, columnMap)) {
+      lastValidRow = r;
+    }
+  }
+  
+  // Extract text from rows after last valid row
+  for (let r = lastValidRow + 1; r < jsonData.length; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    
+    // Skip completely empty rows
+    const hasContent = row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '');
+    if (!hasContent) continue;
+    
+    // Skip rows that are just repeated headers
+    if (isRepeatedHeader(row, columnMap)) continue;
+    
+    // Combine all non-empty cells in the row
+    const rowText = row
+      .filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== '')
+      .map(cell => String(cell).trim())
+      .join(' ');
+    
+    if (rowText) {
+      notes.push(rowText);
+    }
+  }
+  
+  return notes.join('\n');
+};
+
 // Parse rate card details with robust header detection and normalization
-const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
+const parseRateCardDetails = (jsonData: any[][]): { details: RateCardDetail[]; notes: string } => {
   const details: RateCardDetail[] = [];
   
   // Detect header row
   const { headerRowIndex, columnMap } = detectHeaderRow(jsonData);
   
   if (headerRowIndex < 0 || columnMap.size < 3) {
-    return details; // Not enough columns detected
+    return { details, notes: '' }; // Not enough columns detected
   }
+  
+  // Extract notes before processing data
+  const notes = extractNotes(jsonData, headerRowIndex, columnMap);
   
   // Extract data rows
   const dataStartRow = headerRowIndex + 1;
@@ -407,6 +497,11 @@ const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
     const hasData = row.some(cell => cell !== undefined && cell !== null && cell !== '');
     if (!hasData) continue;
     
+    // Only process valid rate rows
+    if (!isValidRateRow(row, columnMap)) {
+      continue;
+    }
+    
     // Extract raw values
     const countryRaw = columnMap.has('country') ? String(row[columnMap.get('country')!] || '').trim() : '';
     const zoneRaw = columnMap.has('zone') ? String(row[columnMap.get('zone')!] || '').trim() : '';
@@ -418,11 +513,6 @@ const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
     const priceRaw = columnMap.has('price') ? row[columnMap.get('price')!] : undefined;
     const registerFeeRaw = columnMap.has('registerFee') ? row[columnMap.get('registerFee')!] : undefined;
     const currencyRaw = columnMap.has('currency') ? String(row[columnMap.get('currency')!] || '').trim() : '';
-    
-    // Skip if no essential data
-    if (!countryRaw && !weightRangeRaw && !weightFromRaw && !priceRaw) {
-      continue;
-    }
     
     // Normalize country
     const { normalized: country, raw: countryRawFinal } = countryRaw ? normalizeCountry(countryRaw) : { normalized: '', raw: '' };
@@ -485,7 +575,7 @@ const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
     details.push(detail);
   }
   
-  return details;
+  return { details, notes };
 };
 
 export const parseExcelFile = async (file: File, checkHistory: (channelCode: string) => Promise<boolean>): Promise<ParsedSheetData[]> => {
@@ -566,8 +656,11 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
             
             // Parse rate card details if this is a rate card
             let rateCardDetails: RateCardDetail[] | undefined;
+            let sheetNotes: string | undefined;
             if (detection.verdict === 'rate' || detection.verdict === 'uncertain') {
-              rateCardDetails = parseRateCardDetails(jsonData);
+              const parseResult = parseRateCardDetails(jsonData);
+              rateCardDetails = parseResult.details;
+              sheetNotes = parseResult.notes || undefined;
             }
             
             // Check if this channel has historical versions
@@ -619,7 +712,8 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
               detectionVerdict: detection.verdict,
               detectionLog: detection.log,
               action: detection.verdict === 'skipped' ? 'skip' : 'import',
-              rateCardDetails
+              rateCardDetails,
+              notes: sheetNotes
             };
           })
         );

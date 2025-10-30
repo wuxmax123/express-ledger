@@ -207,6 +207,7 @@ export interface ParsedSheetData {
   detectionVerdict?: DetectionVerdict;
   detectionLog?: DetectionLog;
   action?: string; // 'import' | 'skip'
+  notes?: string; // Remarks/notes extracted from non-data rows
   manualAnnotation?: {
     productName?: string;
     channelCode?: string;
