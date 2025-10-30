@@ -5,11 +5,13 @@ import { useImportStore } from '@/store/useImportStore';
 import { ParsedSheetData } from '@/types';
 import { useState } from 'react';
 import dayjs from 'dayjs';
+import { ColumnMappingDialog } from './ColumnMappingDialog';
 
 export const ParsePreviewStep = () => {
   const { t } = useTranslation();
   const { parsedSheets, setParsedSheets, setCurrentStep } = useImportStore();
   const [editingSheet, setEditingSheet] = useState<string | null>(null);
+  const [mappingSheet, setMappingSheet] = useState<ParsedSheetData | null>(null);
   
   const handleManualAnnotation = (sheetName: string, values: any) => {
     setParsedSheets(parsedSheets.map(sheet => {
@@ -23,12 +25,30 @@ export const ParsePreviewStep = () => {
           },
           channelCode: values.channelCode || sheet.channelCode,
           effectiveDate: values.effectiveDate ? values.effectiveDate.format('YYYY-MM-DD HH:mm') : sheet.effectiveDate,
-          detectionVerdict: 'rate'
+          detectionVerdict: 'rate',
+          needsMapping: false,
+          confidence: 100
         };
       }
       return sheet;
     }));
     setEditingSheet(null);
+  };
+  
+  const handleColumnMapping = (sheetName: string, mapping: { [key: string]: number }) => {
+    setParsedSheets(parsedSheets.map(sheet => {
+      if (sheet.sheetName === sheetName) {
+        return {
+          ...sheet,
+          manualMapping: mapping,
+          needsMapping: false,
+          confidence: 100,
+          detectionVerdict: 'rate'
+        };
+      }
+      return sheet;
+    }));
+    setMappingSheet(null);
   };
   
   const renderDetectionDetails = (record: ParsedSheetData) => {
@@ -219,7 +239,12 @@ export const ParsePreviewStep = () => {
             <Tag color={colorMap[verdict as keyof typeof colorMap] || 'default'}>
               {verdict || 'N/A'}
             </Tag>
-            {verdict === 'uncertain' && editingSheet !== record.sheetName && (
+            {record.needsMapping && editingSheet !== record.sheetName && (
+              <Button size="small" type="link" onClick={() => setMappingSheet(record)}>
+                Map Columns
+              </Button>
+            )}
+            {verdict === 'uncertain' && !record.needsMapping && editingSheet !== record.sheetName && (
               <Button size="small" type="link" onClick={() => setEditingSheet(record.sheetName)}>
                 Annotate
               </Button>
@@ -247,6 +272,16 @@ export const ParsePreviewStep = () => {
       dataIndex: 'detectionScore',
       key: 'detectionScore',
       render: (score: number) => score !== undefined ? score : '-'
+    },
+    {
+      title: 'Confidence',
+      dataIndex: 'confidence',
+      key: 'confidence',
+      render: (confidence: number, record: ParsedSheetData) => {
+        if (confidence === undefined) return '-';
+        const color = confidence >= 70 ? 'green' : confidence >= 50 ? 'orange' : 'red';
+        return <Tag color={color}>{confidence}%</Tag>;
+      }
     },
     {
       title: 'Version',
@@ -281,10 +316,14 @@ export const ParsePreviewStep = () => {
   ];
 
   const handleNext = () => {
-    // Check if there are any uncertain sheets that haven't been annotated
-    const uncertainSheets = parsedSheets.filter(s => s.detectionVerdict === 'uncertain' && !s.manualAnnotation);
+    // Check if there are any uncertain sheets that haven't been annotated or mapped
+    const uncertainSheets = parsedSheets.filter(s => 
+      (s.detectionVerdict === 'uncertain' || s.needsMapping) && 
+      !s.manualAnnotation && 
+      !s.manualMapping
+    );
     if (uncertainSheets.length > 0) {
-      alert(`Please annotate ${uncertainSheets.length} uncertain sheet(s) before proceeding.`);
+      alert(`Please annotate or map ${uncertainSheets.length} uncertain sheet(s) before proceeding.`);
       return;
     }
     
@@ -304,10 +343,36 @@ export const ParsePreviewStep = () => {
   const rateSheets = parsedSheets.filter(s => s.detectionVerdict !== 'skipped');
   const allFirstVersions = rateSheets.every(s => s.isFirstVersion);
   const skippedCount = parsedSheets.filter(s => s.detectionVerdict === 'skipped').length;
+  const needsMappingCount = parsedSheets.filter(s => s.needsMapping).length;
+  
+  // Get available columns for mapping dialog
+  const getAvailableColumns = (sheet: ParsedSheetData): string[] => {
+    if (!sheet.rows || sheet.rows.length === 0) return [];
+    
+    // Find the header row (first non-empty row with strings)
+    for (let i = 0; i < Math.min(8, sheet.rows.length); i++) {
+      const row = sheet.rows[i];
+      if (row && row.some((cell: any) => typeof cell === 'string' && cell.trim())) {
+        return row.map((cell: any, idx: number) => 
+          typeof cell === 'string' ? cell.trim() : `Column ${idx + 1}`
+        );
+      }
+    }
+    return [];
+  };
 
   return (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold text-foreground">{t('import.preview.title')}</h3>
+      
+      {needsMappingCount > 0 && (
+        <Alert
+          message="Low Confidence Detection"
+          description={`${needsMappingCount} sheet(s) need column mapping confirmation. Click "Map Columns" to proceed.`}
+          type="warning"
+          showIcon
+        />
+      )}
       
       {allFirstVersions && rateSheets.length > 0 && (
         <Alert
@@ -349,6 +414,17 @@ export const ParsePreviewStep = () => {
             false
         }}
       />
+      
+      {mappingSheet && (
+        <ColumnMappingDialog
+          open={!!mappingSheet}
+          sheet={mappingSheet}
+          availableColumns={getAvailableColumns(mappingSheet)}
+          onConfirm={(mapping) => handleColumnMapping(mappingSheet.sheetName, mapping)}
+          onCancel={() => setMappingSheet(null)}
+        />
+      )}
+      
       <div className="flex justify-between mt-6">
         <Button onClick={() => setCurrentStep(0)}>
           {t('common.previous')}

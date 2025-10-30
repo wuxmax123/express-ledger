@@ -208,10 +208,18 @@ export interface ParsedSheetData {
   detectionLog?: DetectionLog;
   action?: string; // 'import' | 'skip'
   notes?: string; // Remarks/notes extracted from non-data rows
+  headerNotes?: string; // Notes from header area (first 3 rows)
+  confidence?: number; // Confidence score 0-100
+  needsMapping?: boolean; // True if confidence < threshold
+  manualMapping?: {
+    [key: string]: number; // field name -> column index
+  };
   manualAnnotation?: {
     productName?: string;
     channelCode?: string;
     effectiveDate?: string;
   };
   rateCardDetails?: RateCardDetail[]; // Parsed rate card data
+  currency?: string; // Sheet-level currency
+  vendorTemplate?: string; // Which vendor template was used
 }

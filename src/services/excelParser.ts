@@ -623,6 +623,13 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
             let sheetType = 'OTHER';
             let channelCode = detection.channelCode || '';
             let effectiveDate = detection.effectiveDate;
+            let confidence = detection.confidence || 0;
+            let needsMapping = false;
+            
+            // Determine if manual mapping is needed (confidence < 70)
+            if (detection.verdict === 'uncertain' || (detection.verdict === 'rate' && confidence < 70)) {
+              needsMapping = true;
+            }
             
             // Cross-reference with directory sheet if no code was detected
             if (!channelCode && directoryMap.size > 0) {
@@ -713,7 +720,9 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
               detectionLog: detection.log,
               action: detection.verdict === 'skipped' ? 'skip' : 'import',
               rateCardDetails,
-              notes: sheetNotes
+              notes: sheetNotes,
+              confidence,
+              needsMapping
             };
           })
         );
@@ -746,28 +755,40 @@ const forwardFillMergedCells = (jsonData: any[][], rows: number): any[][] => {
   return jsonData;
 };
 
-// Three-signal detector
+// Three-signal detector with confidence scoring
 const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   totalScore: number;
   verdict: DetectionVerdict;
   channelCode?: string;
   effectiveDate?: string;
+  confidence?: number;
   log: DetectionLog;
 } => {
   let totalScore = 0;
+  let confidence = 0;
   const log: DetectionLog = {
     totalScore: 0,
     verdict: 'uncertain',
     reason: ''
   };
   
-  // Check whitelist first
-  if (YUNEXPRESS_WHITELIST.test(sheetName)) {
-    totalScore = 100;
-    log.totalScore = 100;
-    log.verdict = 'rate';
-    log.reason = 'Sheet name matches YunExpress whitelist pattern';
-    return { totalScore, verdict: 'rate', log };
+  // Check whitelist first - multiple vendor patterns
+  const whitelistPatterns = [
+    { pattern: /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/, vendor: 'YunExpress' },
+    { pattern: /(顺友).*(挂号|平邮|专线|大货)/, vendor: 'Sunyou' },
+    { pattern: /(4PX|递四方).*(挂号|平邮|专线)/, vendor: '4PX' },
+    { pattern: /(万邦).*(专线|挂号)/, vendor: 'Wanb' }
+  ];
+  
+  for (const { pattern, vendor } of whitelistPatterns) {
+    if (pattern.test(sheetName)) {
+      totalScore = 100;
+      confidence = 100;
+      log.totalScore = 100;
+      log.verdict = 'rate';
+      log.reason = `Sheet name matches ${vendor} whitelist pattern`;
+      return { totalScore, verdict: 'rate', confidence, log };
+    }
   }
   
   // Try to extract channel code from sheet name first
@@ -778,10 +799,12 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     log.totalScore = 100;
     log.verdict = 'rate';
     log.reason = `Sheet name is a valid channel code: ${extractedCode}`;
+    confidence = 95; // High confidence
     return {
       totalScore: 100,
       verdict: 'rate',
       channelCode: extractedCode,
+      confidence,
       log
     };
   }
@@ -793,6 +816,11 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   
   if (headerResult.found && headerResult.channelCode && headerResult.channelCode.length > 0) {
     // Immediate classification as rate card - MUST have valid channel code
+    // Calculate confidence based on header detection strength
+    const hasDate = headerResult.effectiveDate ? 20 : 0;
+    const codeQuality = headerResult.channelCode.length >= 6 ? 20 : 10;
+    confidence = 60 + hasDate + codeQuality; // 60-100 range
+    
     log.totalScore = totalScore;
     log.verdict = 'rate';
     log.reason = 'Channel code found in header (渠道代码/运输代码): ' + headerResult.channelCode;
@@ -801,8 +829,35 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
       verdict: 'rate',
       channelCode: headerResult.channelCode,
       effectiveDate: headerResult.effectiveDate,
+      confidence,
       log
     };
+  }
+  
+  // Signal 2: Column header detection (30 pts)
+  const { headerRowIndex, columnMap } = detectHeaderRow(jsonData);
+  
+  if (headerRowIndex >= 0 && columnMap.size >= 3) {
+    const columnPoints = Math.min(30, columnMap.size * 5);
+    totalScore += columnPoints;
+    confidence = Math.min(70, columnMap.size * 10); // 30-70 range based on columns
+    
+    log.columnSignal = {
+      matchedHeaders: Array.from(columnMap.keys()),
+      points: columnPoints
+    };
+    
+    // If we have key columns (country, weight, price), mark as uncertain for manual review
+    const hasKeyColumns = columnMap.has('country') && 
+                          (columnMap.has('weightRange') || columnMap.has('weightFrom')) &&
+                          columnMap.has('price');
+    
+    if (hasKeyColumns) {
+      log.totalScore = totalScore;
+      log.verdict = 'uncertain';
+      log.reason = `Found ${columnMap.size} rate card columns but no channel code - needs manual confirmation`;
+      return { totalScore, verdict: 'uncertain', confidence, log };
+    }
   }
   
   // If no header signal found, default to skipped (not a rate card)
@@ -810,7 +865,7 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   log.totalScore = 0;
   log.verdict = 'skipped';
   log.reason = 'No channel code (渠道代码) or transport code (运输代码) found - not a rate card';
-  return { totalScore: 0, verdict: 'skipped', log };
+  return { totalScore: 0, verdict: 'skipped', confidence: 0, log };
 };
 
 // Header signal detector (50 pts) - Enhanced for merged cells and multi-line patterns
