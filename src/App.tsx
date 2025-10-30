@@ -10,7 +10,6 @@ import { Layout } from './components/Layout';
 import RateImport from "./pages/RateImport";
 import RateDiff from "./pages/RateDiff";
 import RateHistory from "./pages/RateHistory";
-import RateCalculator from "./pages/RateCalculator";
 import Vendors from "./pages/Vendors";
 import NotFound from "./pages/NotFound";
 
@@ -34,8 +33,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Layout><RateCalculator /></Layout>} />
-              <Route path="/rates/calculator" element={<Layout><RateCalculator /></Layout>} />
+              <Route path="/" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/import" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/diff" element={<Layout><RateDiff /></Layout>} />
               <Route path="/rates/history/:channelId" element={<Layout><RateHistory /></Layout>} />

@@ -5,7 +5,6 @@ const resources = {
   en: {
     translation: {
       // Navigation
-      'nav.calculator': 'Rate Calculator',
       'nav.import': 'Import',
       'nav.diff': 'Difference Center',
       'nav.history': 'Version History',
@@ -81,7 +80,6 @@ const resources = {
   zh: {
     translation: {
       // Navigation
-      'nav.calculator': '价格计算',
       'nav.import': '导入',
       'nav.diff': '差异中心',
       'nav.history': '版本历史',
