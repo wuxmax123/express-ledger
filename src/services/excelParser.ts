@@ -176,11 +176,11 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   log.headerSignal = headerResult;
   totalScore += headerResult.points;
   
-  if (headerResult.found && headerResult.channelCode) {
-    // Immediate classification as rate card
+  if (headerResult.found && headerResult.channelCode && headerResult.channelCode.length > 0) {
+    // Immediate classification as rate card - MUST have valid channel code
     log.totalScore = totalScore;
     log.verdict = 'rate';
-    log.reason = 'Channel code found in header (渠道代码/运输代码)';
+    log.reason = 'Channel code found in header (渠道代码/运输代码): ' + headerResult.channelCode;
     return {
       totalScore,
       verdict: 'rate',
@@ -205,27 +205,42 @@ const detectHeaderSignal = (jsonData: any[][]): {
   effectiveDate?: string;
   points: number;
 } => {
-  const channelRegex = /运输代码[:：]\s*([A-Za-z0-9\-]+)/;
+  // Multiple regex patterns for channel/transport code
+  const channelRegexes = [
+    /运输代码[:：]\s*([A-Za-z0-9\-]+)/,
+    /渠道代码[:：]\s*([A-Za-z0-9\-]+)/,
+    /Channel\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i,
+    /Transport\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i
+  ];
   const dateRegex = /(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/;
   
   const maxRows = Math.min(12, jsonData.length);
   for (let r = 0; r < maxRows; r++) {
     const row = jsonData[r];
     if (!row) continue;
-    const maxCols = Math.min(6, row.length);
+    const maxCols = Math.min(8, row.length);
     for (let c = 0; c < maxCols; c++) {
       const cell = row[c];
       if (typeof cell === 'string') {
         const normalized = normalizeText(cell);
-        const channelMatch = normalized.match(channelRegex);
-        if (channelMatch) {
-          const dateMatch = normalized.match(dateRegex);
-          return {
-            found: true,
-            channelCode: channelMatch[1].toUpperCase(),
-            effectiveDate: dateMatch ? dateMatch[1] : undefined,
-            points: 50
-          };
+        
+        // Try all channel code patterns
+        for (const channelRegex of channelRegexes) {
+          const channelMatch = normalized.match(channelRegex);
+          if (channelMatch && channelMatch[1]) {
+            const dateMatch = normalized.match(dateRegex);
+            const extractedCode = channelMatch[1].trim().toUpperCase();
+            
+            // Ensure channel code is not empty
+            if (extractedCode.length > 0) {
+              return {
+                found: true,
+                channelCode: extractedCode,
+                effectiveDate: dateMatch ? dateMatch[1] : undefined,
+                points: 50
+              };
+            }
+          }
         }
       }
     }
