@@ -6,7 +6,8 @@ import {
   DiffOutlined, 
   HistoryOutlined,
   ShopOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  CalculatorOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -22,6 +23,12 @@ export const Layout = ({ children }: LayoutProps) => {
   const { t, i18n } = useTranslation();
 
   const menuItems: MenuProps['items'] = [
+    {
+      key: '/rates/calculator',
+      icon: <CalculatorOutlined />,
+      label: t('nav.calculator'),
+      onClick: () => navigate('/rates/calculator')
+    },
     {
       key: '/rates/import',
       icon: <UploadOutlined />,
