@@ -777,7 +777,8 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     { pattern: /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/, vendor: 'YunExpress' },
     { pattern: /(顺友).*(挂号|平邮|专线|大货)/, vendor: 'Sunyou' },
     { pattern: /(4PX|递四方).*(挂号|平邮|专线)/, vendor: '4PX' },
-    { pattern: /(万邦).*(专线|挂号)/, vendor: 'Wanb' }
+    { pattern: /(万邦).*(专线|挂号)/, vendor: 'Wanb' },
+    { pattern: /(燕文).*(挂号|平邮|专线|包裹|小包|全球)/, vendor: 'Yanwen' }
   ];
   
   for (const { pattern, vendor } of whitelistPatterns) {

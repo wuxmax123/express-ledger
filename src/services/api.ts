@@ -9,6 +9,7 @@ const mockVendors: Vendor[] = [
   { id: 2, name: '递四方', code: '4PX', contactInfo: 'contact@4px.com', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
   { id: 3, name: '万邦速达', code: 'WANBEXPRESS', contactInfo: 'contact@wanb.com', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
   { id: 4, name: '顺友物流', code: 'SUNYOU', contactInfo: 'contact@sunyou.com', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+  { id: 5, name: '燕文物流', code: 'YANWEN', contactInfo: 'contact@yanwen.com', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
 ];
 
 const mockChannels: ShippingChannel[] = [
