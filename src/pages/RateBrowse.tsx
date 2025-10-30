@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Select, Input, Button, Drawer, Tag } from 'antd';
 import { DownloadOutlined, FilterOutlined } from '@ant-design/icons';
 import { api } from '@/services/api';
+import { useImportStore } from '@/store/useImportStore';
 import type { RateBrowseItem, Vendor, ShippingChannel } from '@/types';
 import * as XLSX from 'xlsx';
 
@@ -10,17 +11,14 @@ const { Option } = Select;
 
 export default function RateBrowse() {
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<RateBrowseItem[]>([]);
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
+  const { parsedSheets, selectedVendorId } = useImportStore();
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 });
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [channels, setChannels] = useState<ShippingChannel[]>([]);
   const [selectedRow, setSelectedRow] = useState<RateBrowseItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [filters, setFilters] = useState({
-    vendorId: undefined as number | undefined,
-    channelId: undefined as number | undefined,
+    sheetName: undefined as string | undefined,
     country: undefined as string | undefined,
     zone: undefined as string | undefined,
     weightFrom: undefined as number | undefined,
@@ -29,64 +27,97 @@ export default function RateBrowse() {
 
   useEffect(() => {
     loadVendors();
-    loadData();
   }, []);
-
-  useEffect(() => {
-    if (filters.vendorId) {
-      loadChannels(filters.vendorId);
-    } else {
-      setChannels([]);
-    }
-  }, [filters.vendorId]);
 
   const loadVendors = async () => {
     const vendors = await api.getVendors();
     setVendors(vendors);
   };
 
-  const loadChannels = async (vendorId: number) => {
-    const channels = await api.getChannels(vendorId);
-    setChannels(channels);
-  };
+  // Convert parsed sheet data to RateBrowseItem format
+  const allData = useMemo(() => {
+    const items: RateBrowseItem[] = [];
+    let idCounter = 1;
 
-  const loadData = async (page = 1, pageSize = 20) => {
-    setLoading(true);
-    try {
-      const result = await api.getRateBrowse({
-        ...filters,
-        page,
-        size: pageSize,
-      });
-      setData(result.content);
-      setPagination({ current: page, pageSize, total: result.totalElements });
-    } finally {
-      setLoading(false);
-    }
-  };
+    parsedSheets.forEach((sheet) => {
+      if (sheet.rateCardDetails && sheet.rateCardDetails.length > 0) {
+        sheet.rateCardDetails.forEach((detail) => {
+          // Parse weight range
+          let weightFrom = 0;
+          let weightTo = 0;
+          if (detail.weightRange) {
+            const match = detail.weightRange.match(/\[([\d.]+),\s*([\d.]+)\)/);
+            if (match) {
+              weightFrom = parseFloat(match[1]);
+              weightTo = parseFloat(match[2]);
+            }
+          }
 
-  const handleTableChange = (pagination: any) => {
-    loadData(pagination.current, pagination.pageSize);
+          items.push({
+            id: idCounter++,
+            sheetId: 1,
+            channelId: 1,
+            channelName: sheet.sheetName,
+            vendorId: selectedVendorId || 1,
+            vendorName: vendors.find(v => v.id === selectedVendorId)?.name || 'Unknown',
+            versionCode: 'v1.0.0',
+            country: detail.country || '-',
+            zone: detail.zone || '-',
+            eta: detail.eta || '-',
+            weightFrom,
+            weightTo,
+            minChargeableWeight: detail.minChargeableWeight ? parseFloat(detail.minChargeableWeight.toString()) : undefined,
+            price: detail.rate ? parseFloat(detail.rate.toString()) : 0,
+            currency: 'RMB',
+            registerFee: detail.registrationFee ? parseFloat(detail.registrationFee.toString()) : undefined,
+          });
+        });
+      }
+    });
+
+    return items;
+  }, [parsedSheets, selectedVendorId, vendors]);
+
+  // Apply filters
+  const filteredData = useMemo(() => {
+    return allData.filter((item) => {
+      if (filters.sheetName && item.channelName !== filters.sheetName) return false;
+      if (filters.country && !item.country.toLowerCase().includes(filters.country.toLowerCase())) return false;
+      if (filters.zone && !item.zone.toLowerCase().includes(filters.zone.toLowerCase())) return false;
+      if (filters.weightFrom !== undefined && item.weightTo <= filters.weightFrom) return false;
+      if (filters.weightTo !== undefined && item.weightFrom >= filters.weightTo) return false;
+      return true;
+    });
+  }, [allData, filters]);
+
+  // Paginate data
+  const paginatedData = useMemo(() => {
+    const start = (pagination.current - 1) * pagination.pageSize;
+    const end = start + pagination.pageSize;
+    return filteredData.slice(start, end);
+  }, [filteredData, pagination]);
+
+  const handleTableChange = (newPagination: any) => {
+    setPagination({ current: newPagination.current, pageSize: newPagination.pageSize });
   };
 
   const handleFilter = () => {
-    loadData(1, pagination.pageSize);
+    setPagination({ current: 1, pageSize: pagination.pageSize });
   };
 
   const handleReset = () => {
     setFilters({
-      vendorId: undefined,
-      channelId: undefined,
+      sheetName: undefined,
       country: undefined,
       zone: undefined,
       weightFrom: undefined,
       weightTo: undefined,
     });
-    setTimeout(() => loadData(1, pagination.pageSize), 0);
+    setPagination({ current: 1, pageSize: pagination.pageSize });
   };
 
   const handleExport = () => {
-    const exportData = data.map(item => ({
+    const exportData = filteredData.map(item => ({
       [t('rateBrowse.vendor')]: item.vendorName,
       [t('rateBrowse.channel')]: item.channelName,
       [t('rateBrowse.version')]: item.versionCode,
@@ -184,27 +215,15 @@ export default function RateBrowse() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <Select
-              placeholder={t('rateBrowse.selectVendor')}
-              value={filters.vendorId}
-              onChange={(value) => setFilters({ ...filters, vendorId: value, channelId: undefined })}
+              placeholder={t('rateBrowse.selectSheet')}
+              value={filters.sheetName}
+              onChange={(value) => setFilters({ ...filters, sheetName: value })}
               allowClear
             >
-              {vendors.map(v => (
-                <Option key={v.id} value={v.id}>{v.name}</Option>
-              ))}
-            </Select>
-
-            <Select
-              placeholder={t('rateBrowse.selectChannel')}
-              value={filters.channelId}
-              onChange={(value) => setFilters({ ...filters, channelId: value })}
-              disabled={!filters.vendorId}
-              allowClear
-            >
-              {channels.map(c => (
-                <Option key={c.id} value={c.id}>{c.name}</Option>
+              {parsedSheets.map((sheet, index) => (
+                <Option key={index} value={sheet.sheetName}>{sheet.sheetName}</Option>
               ))}
             </Select>
 
@@ -247,10 +266,15 @@ export default function RateBrowse() {
       <Card>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={paginatedData}
           rowKey="id"
-          loading={loading}
-          pagination={pagination}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: filteredData.length,
+            showSizeChanger: true,
+            showTotal: (total) => t('rateBrowse.totalItems', { total }),
+          }}
           onChange={handleTableChange}
           scroll={{ x: 1200 }}
           onRow={(record) => ({

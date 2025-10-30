@@ -80,12 +80,14 @@ const resources = {
       'rateBrowse.registerFee': 'Register Fee',
       'rateBrowse.selectVendor': 'Select Vendor',
       'rateBrowse.selectChannel': 'Select Channel',
+      'rateBrowse.selectSheet': 'Select Sheet',
       'rateBrowse.weightFrom': 'Weight From (kg)',
       'rateBrowse.weightTo': 'Weight To (kg)',
       'rateBrowse.filter': 'Filter',
       'rateBrowse.reset': 'Reset',
       'rateBrowse.export': 'Export',
       'rateBrowse.details': 'Details',
+      'rateBrowse.totalItems': 'Total {{total}} items',
       
       // Rate Compare
       'rateCompare.title': 'Cross-Channel Rate Comparator',
@@ -207,12 +209,14 @@ const resources = {
       'rateBrowse.registerFee': '挂号费',
       'rateBrowse.selectVendor': '选择物流商',
       'rateBrowse.selectChannel': '选择渠道',
+      'rateBrowse.selectSheet': '选择表格',
       'rateBrowse.weightFrom': '起始重量 (kg)',
       'rateBrowse.weightTo': '结束重量 (kg)',
       'rateBrowse.filter': '筛选',
       'rateBrowse.reset': '重置',
       'rateBrowse.export': '导出',
       'rateBrowse.details': '详情',
+      'rateBrowse.totalItems': '共 {{total}} 条',
       
       // Rate Compare
       'rateCompare.title': '跨渠道价格对比',
