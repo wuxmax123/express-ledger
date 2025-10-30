@@ -6,7 +6,9 @@ import {
   DiffOutlined, 
   HistoryOutlined,
   ShopOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  DatabaseOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -39,6 +41,18 @@ export const Layout = ({ children }: LayoutProps) => {
       icon: <HistoryOutlined />,
       label: t('nav.history'),
       onClick: () => navigate('/rates/history/1')
+    },
+    {
+      key: '/rates/browse',
+      icon: <DatabaseOutlined />,
+      label: t('nav.browse'),
+      onClick: () => navigate('/rates/browse')
+    },
+    {
+      key: '/rates/compare',
+      icon: <SwapOutlined />,
+      label: t('nav.compare'),
+      onClick: () => navigate('/rates/compare')
     },
     {
       key: '/vendors',

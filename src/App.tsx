@@ -10,6 +10,8 @@ import { Layout } from './components/Layout';
 import RateImport from "./pages/RateImport";
 import RateDiff from "./pages/RateDiff";
 import RateHistory from "./pages/RateHistory";
+import RateBrowse from "./pages/RateBrowse";
+import RateCompare from "./pages/RateCompare";
 import Vendors from "./pages/Vendors";
 import NotFound from "./pages/NotFound";
 
@@ -37,6 +39,8 @@ const App = () => (
               <Route path="/rates/import" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/diff" element={<Layout><RateDiff /></Layout>} />
               <Route path="/rates/history/:channelId" element={<Layout><RateHistory /></Layout>} />
+              <Route path="/rates/browse" element={<Layout><RateBrowse /></Layout>} />
+              <Route path="/rates/compare" element={<Layout><RateCompare /></Layout>} />
               <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

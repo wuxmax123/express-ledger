@@ -120,6 +120,66 @@ export interface RateCardDetail {
   registrationFee?: string; // 挂号费
 }
 
+// Rate Browse & Compare types
+export interface RateBrowseItem {
+  id: number;
+  sheetId: number;
+  channelId: number;
+  channelName: string;
+  vendorId: number;
+  vendorName: string;
+  versionCode: string;
+  country: string;
+  zone?: string;
+  eta?: string;
+  weightFrom: number;
+  weightTo: number;
+  minChargeableWeight?: number;
+  price: number;
+  currency: string;
+  registerFee?: number;
+}
+
+export interface RateBrowseParams {
+  vendorId?: number;
+  channelId?: number;
+  country?: string;
+  zone?: string;
+  versionId?: number;
+  weightFrom?: number;
+  weightTo?: number;
+  page?: number;
+  size?: number;
+}
+
+export interface RateCompareParams {
+  vendorIds?: number[];
+  channelIds?: number[];
+  country: string;
+  versionId?: number;
+  targetWeight?: number;
+  weightBracket?: { from: number; to: number };
+  sortBy?: 'PRICE' | 'ETA';
+}
+
+export interface RateCompareResult {
+  channelId: number;
+  channelName: string;
+  channelCode: string;
+  vendorId: number;
+  vendorName: string;
+  country: string;
+  matchedBracket: string;
+  minChargeableWeight?: number;
+  price: number;
+  registerFee?: number;
+  totalPrice: number;
+  eta?: string;
+  etaMin?: number;
+  isBest: boolean;
+  currency: string;
+}
+
 export interface ParsedSheetData {
   sheetName: string;
   sheetType: string;

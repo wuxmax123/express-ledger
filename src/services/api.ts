@@ -164,5 +164,96 @@ export const api = {
         updatedAt: '2024-02-01'
       },
     ];
+  },
+
+  // Rate Browse
+  getRateBrowse: async (params: any) => {
+    // TODO: Replace with actual API call
+    // return client.get('/rates/browse?' + new URLSearchParams(params));
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Mock data
+    const mockData = Array.from({ length: 50 }, (_, i) => ({
+      id: i + 1,
+      sheetId: 1,
+      channelId: 1,
+      channelName: '云途美国专线',
+      vendorId: 1,
+      vendorName: '云途物流',
+      versionCode: 'v1.0.0',
+      country: ['US', 'UK', 'CA', 'AU', 'DE'][i % 5],
+      zone: `Zone ${(i % 3) + 1}`,
+      eta: `${5 + (i % 5)}-${10 + (i % 5)}工作日`,
+      weightFrom: (i % 10) * 0.5,
+      weightTo: ((i % 10) + 1) * 0.5,
+      minChargeableWeight: 0.05,
+      price: 45.50 + (i % 20),
+      currency: 'RMB',
+      registerFee: 8.0,
+    }));
+
+    const page = params.page || 1;
+    const size = params.size || 20;
+    const start = (page - 1) * size;
+    const end = start + size;
+
+    return {
+      content: mockData.slice(start, end),
+      totalElements: mockData.length,
+      totalPages: Math.ceil(mockData.length / size),
+      size,
+      number: page - 1,
+    };
+  },
+
+  // Rate Compare
+  getRateCompare: async (params: any) => {
+    // TODO: Replace with actual API call
+    // return client.get('/rates/compare?' + new URLSearchParams(params));
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Mock comparison data
+    const channels = [
+      { id: 1, name: '云途美国专线', code: 'YE001', vendorId: 1, vendorName: '云途物流' },
+      { id: 2, name: '递四方美国专线', code: '4PX001', vendorId: 2, vendorName: '递四方' },
+      { id: 3, name: '万邦美国专线', code: 'WE001', vendorId: 3, vendorName: '万邦速达' },
+    ];
+
+    const results = channels.map((ch, i) => {
+      const price = 45.50 + i * 2.5;
+      const registerFee = 8.0;
+      const etaMin = 5 + i;
+      return {
+        channelId: ch.id,
+        channelName: ch.name,
+        channelCode: ch.code,
+        vendorId: ch.vendorId,
+        vendorName: ch.vendorName,
+        country: params.country || 'US',
+        matchedBracket: '[0.5, 1.0) kg',
+        minChargeableWeight: 0.05,
+        price,
+        registerFee,
+        totalPrice: price + registerFee,
+        eta: `${etaMin}-${etaMin + 5}工作日`,
+        etaMin,
+        isBest: false,
+        currency: 'RMB',
+      };
+    });
+
+    // Mark best based on sortBy
+    if (results.length > 0) {
+      if (params.sortBy === 'ETA') {
+        results.sort((a, b) => (a.etaMin || 999) - (b.etaMin || 999));
+      } else {
+        results.sort((a, b) => a.totalPrice - b.totalPrice);
+      }
+      results[0].isBest = true;
+    }
+
+    return results;
   }
 };
