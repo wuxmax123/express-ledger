@@ -1,0 +1,62 @@
+{
+  "vendor": "YunExpress",
+  "file_patterns": [".*云途.*报价.*", ".*YunExpress.*rate.*"],
+  "sheets": [
+    {
+      "match": {"name_regex": "^(?!报价总目录|目录国家维度).+$"},
+      "type": "rate_card",
+      "header_row_index": 1,
+      "meta_extract": {
+        "channel_code": {
+          "source": "cell_search",
+          "row_range": [0, 6],
+          "col_range": [0, 2],
+          "regex": "运输代码[:：]\\s*([A-Za-z0-9]+)"
+        },
+        "effective_date": {
+          "source": "cell_search",
+          "row_range": [0, 6],
+          "col_range": [0, 3],
+          "regex": "(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})"
+        }
+      },
+      "columns": {
+        "country": ["国家/地区","国家","目的地"],
+        "eta": ["参考时效","时效","派送时效"],
+        "zone": ["分区","区域","分区代码"],
+        "weight_range": ["重量(KG)","重量区间","重量段"],
+        "rounding_step": ["进位制(KG)","进位制","计费进位"],
+        "min_chargeable_weight": ["最低计费重(KG)","最低计费重","最低计费重量"],
+        "price_per_kg": ["运费(RMB/KG)","运费(元/KG)","价格"],
+        "register_fee": ["挂号费(RMB/票)","挂号费","处理费"]
+      },
+      "unit_rules": {
+        "weight": {"to": "kg", "precision": 3},
+        "price": {"currency": "RMB", "precision": 2}
+      },
+      "weight_range_parse": {
+        "pattern_inclusive": "(?P<l>\\d+(\\.\\d+)?)[＜<]\\s*W\\s*[≤<=]\\s*(?P<u>\\d+(\\.\\d+)?)",
+        "pattern_open_low": "^0[＜<]\\s*W\\s*[≤<=]\\s*(?P<u>\\d+(\\.\\d+)?)$",
+        "pattern_open_high": "^(?P<l>\\d+(\\.\\d+)?)\\s*[＜<]\\s*W\\s*[≤<=]\\s*MAX$",
+        "left_inclusive": true,
+        "right_inclusive": false
+      },
+      "schema_change_policy": {
+        "minor_threshold_kg": 0.01,
+        "classify": ["NONE","MINOR","MAJOR"],
+        "block_on": ["MAJOR"]
+      }
+    },
+    {
+      "match": {"name_regex": ".*(偏远|附加费|紧急).*"},
+      "type": "surcharge",
+      "header_row_index": 0,
+      "columns": {
+        "postcode": ["邮编","邮政编码","ZIP"],
+        "city": ["城市","City"],
+        "province": ["省/州","州","省份"],
+        "note": ["备注","说明"]
+      }
+    }
+  ]
+}

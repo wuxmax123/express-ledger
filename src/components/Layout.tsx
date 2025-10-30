@@ -1,0 +1,93 @@
+import { Layout as AntLayout, Menu, Button, Dropdown } from 'antd';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { 
+  UploadOutlined, 
+  DiffOutlined, 
+  HistoryOutlined,
+  ShopOutlined,
+  GlobalOutlined
+} from '@ant-design/icons';
+import type { MenuProps } from 'antd';
+
+const { Header, Content, Sider } = AntLayout;
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export const Layout = ({ children }: LayoutProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t, i18n } = useTranslation();
+
+  const menuItems: MenuProps['items'] = [
+    {
+      key: '/rates/import',
+      icon: <UploadOutlined />,
+      label: t('nav.import'),
+      onClick: () => navigate('/rates/import')
+    },
+    {
+      key: '/rates/diff',
+      icon: <DiffOutlined />,
+      label: t('nav.diff'),
+      onClick: () => navigate('/rates/diff')
+    },
+    {
+      key: '/rates/history',
+      icon: <HistoryOutlined />,
+      label: t('nav.history'),
+      onClick: () => navigate('/rates/history/1')
+    },
+    {
+      key: '/vendors',
+      icon: <ShopOutlined />,
+      label: t('nav.vendors'),
+      onClick: () => navigate('/vendors')
+    }
+  ];
+
+  const languageItems: MenuProps['items'] = [
+    {
+      key: 'zh',
+      label: '中文',
+      onClick: () => i18n.changeLanguage('zh')
+    },
+    {
+      key: 'en',
+      label: 'English',
+      onClick: () => i18n.changeLanguage('en')
+    }
+  ];
+
+  return (
+    <AntLayout className="min-h-screen">
+      <Header className="flex items-center justify-between px-6 bg-primary">
+        <div className="flex items-center gap-4">
+          <div className="text-white text-xl font-bold">
+            Logistics Rate Management
+          </div>
+        </div>
+        <Dropdown menu={{ items: languageItems }} placement="bottomRight">
+          <Button type="text" icon={<GlobalOutlined />} className="text-white">
+            {i18n.language === 'zh' ? '中文' : 'English'}
+          </Button>
+        </Dropdown>
+      </Header>
+      <AntLayout>
+        <Sider width={220} className="bg-card">
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={menuItems}
+            className="h-full border-r-0"
+          />
+        </Sider>
+        <Content className="p-6 bg-background">
+          {children}
+        </Content>
+      </AntLayout>
+    </AntLayout>
+  );
+};

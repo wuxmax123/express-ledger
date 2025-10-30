@@ -3,24 +3,47 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { ConfigProvider, theme } from 'antd';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n/config';
+import { Layout } from './components/Layout';
+import RateImport from "./pages/RateImport";
+import RateDiff from "./pages/RateDiff";
+import RateHistory from "./pages/RateHistory";
+import Vendors from "./pages/Vendors";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <I18nextProvider i18n={i18n}>
+      <ConfigProvider
+        theme={{
+          token: {
+            colorPrimary: '#0080FF',
+            colorInfo: '#0080FF',
+            borderRadius: 8,
+          },
+          algorithm: theme.defaultAlgorithm
+        }}
+      >
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Layout><RateImport /></Layout>} />
+              <Route path="/rates/import" element={<Layout><RateImport /></Layout>} />
+              <Route path="/rates/diff" element={<Layout><RateDiff /></Layout>} />
+              <Route path="/rates/history/:channelId" element={<Layout><RateHistory /></Layout>} />
+              <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ConfigProvider>
+    </I18nextProvider>
   </QueryClientProvider>
 );
 
