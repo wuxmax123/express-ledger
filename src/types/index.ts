@@ -23,9 +23,21 @@ export interface ShippingChannel {
   updatedAt: string;
 }
 
+export interface VendorBatch {
+  id: number;
+  vendorId: number;
+  fileName: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  effectiveDate?: string;
+  totalChannels: number;
+  notes?: string;
+}
+
 export interface ChannelRateSheet {
   id: number;
   channelId: number;
+  batchId?: number;
   versionCode: string;
   effectiveDate: string;
   fileName: string;

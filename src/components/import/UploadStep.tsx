@@ -11,7 +11,7 @@ const { Dragger } = Upload;
 
 export const UploadStep = () => {
   const { t } = useTranslation();
-  const { selectedVendorId, setSelectedVendorId, setParsedSheets, setCurrentStep } = useImportStore();
+  const { selectedVendorId, setSelectedVendorId, setParsedSheets, setCurrentStep, setUploadFileName } = useImportStore();
   const { data: vendors } = useQuery({
     queryKey: ['vendors'],
     queryFn: api.getVendors
@@ -31,6 +31,7 @@ export const UploadStep = () => {
         message.loading({ content: t('import.parsing'), key: 'parsing' });
         const sheets = await parseExcelFile(file, api.checkChannelHistory);
         setParsedSheets(sheets);
+        setUploadFileName(file.name);
         message.success({ content: 'File parsed successfully', key: 'parsing' });
         setCurrentStep(1);
       } catch (error) {

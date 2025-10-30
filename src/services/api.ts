@@ -1,4 +1,4 @@
-import { Vendor, ShippingChannel, RateDiff, ChannelRateSheet, ImportJob } from '@/types';
+import { Vendor, ShippingChannel, RateDiff, ChannelRateSheet, ImportJob, VendorBatch } from '@/types';
 
 // Mock API base URL - replace with your Java Spring Boot backend URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -138,31 +138,114 @@ export const api = {
     ];
   },
 
+  // Vendor Batches
+  getVendorBatches: async (vendorId: number): Promise<VendorBatch[]> => {
+    // Mock data
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return [
+      {
+        id: 1,
+        vendorId,
+        fileName: '云途报价20251020.xlsx',
+        uploadedBy: 'admin',
+        uploadedAt: '2025-10-20T10:30:00',
+        effectiveDate: '2025-10-21',
+        totalChannels: 22,
+        notes: '调整欧洲区价格，新增俄罗斯专线'
+      },
+      {
+        id: 2,
+        vendorId,
+        fileName: '云途报价20250915.xlsx',
+        uploadedBy: 'admin',
+        uploadedAt: '2025-09-15T14:20:00',
+        effectiveDate: '2025-09-16',
+        totalChannels: 20,
+        notes: '新增美国专线，优化亚洲区时效'
+      },
+      {
+        id: 3,
+        vendorId,
+        fileName: '云途报价20250801.xlsx',
+        uploadedBy: 'system',
+        uploadedAt: '2025-08-01T09:00:00',
+        effectiveDate: '2025-08-02',
+        totalChannels: 18,
+      },
+    ];
+  },
+
+  getBatchChannels: async (batchId: number): Promise<ChannelRateSheet[]> => {
+    // Mock data for channels in a batch
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return [
+      {
+        id: 1,
+        channelId: 1,
+        batchId,
+        versionCode: 'v20251020',
+        effectiveDate: '2025-10-21',
+        fileName: '云途报价20251020.xlsx',
+        uploadedBy: 'admin',
+        status: 'active',
+        createdAt: '2025-10-20T10:30:00',
+        updatedAt: '2025-10-20T10:30:00'
+      },
+      {
+        id: 2,
+        channelId: 2,
+        batchId,
+        versionCode: 'v20251020',
+        effectiveDate: '2025-10-21',
+        fileName: '云途报价20251020.xlsx',
+        uploadedBy: 'admin',
+        status: 'active',
+        createdAt: '2025-10-20T10:30:00',
+        updatedAt: '2025-10-20T10:30:00'
+      },
+    ];
+  },
+
   // Version history
   getChannelVersions: async (channelId: number): Promise<ChannelRateSheet[]> => {
     // Mock data
+    await new Promise(resolve => setTimeout(resolve, 300));
     return [
       {
         id: 1,
         channelId,
-        versionCode: 'v1.0.0',
-        effectiveDate: '2024-01-01',
-        fileName: 'yunexpress_rates_202401.xlsx',
+        batchId: 1,
+        versionCode: 'v20251020',
+        effectiveDate: '2025-10-21',
+        fileName: '云途报价20251020.xlsx',
         uploadedBy: 'admin',
         status: 'active',
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01'
+        createdAt: '2025-10-20T10:30:00',
+        updatedAt: '2025-10-20T10:30:00'
       },
       {
         id: 2,
         channelId,
-        versionCode: 'v1.1.0',
-        effectiveDate: '2024-02-01',
-        fileName: 'yunexpress_rates_202402.xlsx',
+        batchId: 2,
+        versionCode: 'v20250915',
+        effectiveDate: '2025-09-16',
+        fileName: '云途报价20250915.xlsx',
         uploadedBy: 'admin',
         status: 'inactive',
-        createdAt: '2024-02-01',
-        updatedAt: '2024-02-01'
+        createdAt: '2025-09-15T14:20:00',
+        updatedAt: '2025-09-15T14:20:00'
+      },
+      {
+        id: 3,
+        channelId,
+        batchId: 3,
+        versionCode: 'v20250801',
+        effectiveDate: '2025-08-02',
+        fileName: '云途报价20250801.xlsx',
+        uploadedBy: 'system',
+        status: 'inactive',
+        createdAt: '2025-08-01T09:00:00',
+        updatedAt: '2025-08-01T09:00:00'
       },
     ];
   },
