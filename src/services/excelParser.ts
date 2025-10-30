@@ -778,7 +778,9 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
     { pattern: /(顺友).*(挂号|平邮|专线|大货)/, vendor: 'Sunyou' },
     { pattern: /(4PX|递四方).*(挂号|平邮|专线)/, vendor: '4PX' },
     { pattern: /(万邦).*(专线|挂号)/, vendor: 'Wanb' },
-    { pattern: /(燕文).*(挂号|平邮|专线|包裹|小包|全球)/, vendor: 'Yanwen' }
+    { pattern: /(燕文).*(追踪|惠选|大货|快线|快递|精品|服装|轻小件|挂号|平邮|专线|包裹|小包|全球|航空|经济|沃尔玛|Coupang|Aramex|BBC|化妆品)/, vendor: 'Yanwen' },
+    { pattern: /(华南EMS|中邮|E特快|E邮宝).*(华南|深圳|上海)/, vendor: 'Yanwen' },
+    { pattern: /(香港|大陆)(DHL|UPS|FEDEX)/, vendor: 'Yanwen' }
   ];
   
   for (const { pattern, vendor } of whitelistPatterns) {
