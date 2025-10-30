@@ -109,6 +109,19 @@ export interface RateDiff {
   newPrice: number;
   delta: number;
   deltaPct: number;
+  channelName?: string;
+}
+
+export interface ChannelNoticeSummary {
+  channelId: number;
+  channelName: string;
+  avgChangePct: number;
+  increaseCount: number;
+  decreaseCount: number;
+  maxIncreasePct: number;
+  maxDecreasePct: number;
+  effectiveDate: string;
+  summaryLines: string[];
 }
 
 export type DetectionVerdict = 'rate' | 'uncertain' | 'skipped';

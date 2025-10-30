@@ -1,4 +1,4 @@
-import { Vendor, ShippingChannel, RateDiff, ChannelRateSheet, ImportJob, VendorBatch } from '@/types';
+import { Vendor, ShippingChannel, RateDiff, ChannelRateSheet, ImportJob, VendorBatch, ChannelNoticeSummary } from '@/types';
 
 // Mock API base URL - replace with your Java Spring Boot backend URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -105,8 +105,8 @@ export const api = {
     startDate?: string;
     endDate?: string;
   }): Promise<RateDiff[]> => {
-    // Mock data
-    return [
+    // Mock data with channel names
+    const mockDiffs = [
       {
         id: 1,
         oldSheetId: 1,
@@ -119,7 +119,8 @@ export const api = {
         oldPrice: 45.50,
         newPrice: 48.00,
         delta: 2.50,
-        deltaPct: 5.49
+        deltaPct: 5.49,
+        channelName: '云途美国专线'
       },
       {
         id: 2,
@@ -133,9 +134,52 @@ export const api = {
         oldPrice: 52.00,
         newPrice: 50.00,
         delta: -2.00,
-        deltaPct: -3.85
+        deltaPct: -3.85,
+        channelName: '云途美国专线'
+      },
+      {
+        id: 3,
+        oldSheetId: 1,
+        newSheetId: 2,
+        channelId: 2,
+        country: 'UK',
+        zone: 'Zone 2',
+        weightFrom: 0,
+        weightTo: 0.5,
+        oldPrice: 38.00,
+        newPrice: 42.00,
+        delta: 4.00,
+        deltaPct: 10.53,
+        channelName: '云途英国专线'
       },
     ];
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return mockDiffs;
+  },
+
+  generateNotice: async (channelIds: number[]): Promise<ChannelNoticeSummary[]> => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const summaries = channelIds.map(id => {
+      const channel = mockChannels.find(c => c.id === id);
+      return {
+        channelId: id,
+        channelName: channel?.name || `Channel ${id}`,
+        avgChangePct: Math.random() * 10 - 2,
+        increaseCount: Math.floor(Math.random() * 20) + 5,
+        decreaseCount: Math.floor(Math.random() * 10),
+        maxIncreasePct: Math.random() * 20 + 5,
+        maxDecreasePct: -(Math.random() * 15 + 2),
+        effectiveDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        summaryLines: [
+          '主要涨价区间：欧洲区 1-5kg',
+          '主要降价区间：美国区 5-10kg'
+        ]
+      };
+    });
+    
+    return summaries;
   },
 
   // Vendor Batches
