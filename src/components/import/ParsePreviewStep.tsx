@@ -78,6 +78,20 @@ export const ParsePreviewStep = () => {
     );
   };
   
+  const handleSkipSheet = (sheetName: string) => {
+    setParsedSheets(parsedSheets.map(sheet => {
+      if (sheet.sheetName === sheetName) {
+        return {
+          ...sheet,
+          detectionVerdict: 'skipped',
+          action: 'skip'
+        };
+      }
+      return sheet;
+    }));
+    setEditingSheet(null);
+  };
+  
   const renderManualAnnotationForm = (record: ParsedSheetData) => {
     return (
       <Form
@@ -105,6 +119,7 @@ export const ParsePreviewStep = () => {
         <Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" size="small">Save</Button>
+            <Button size="small" onClick={() => handleSkipSheet(record.sheetName)}>Skip</Button>
             <Button size="small" onClick={() => setEditingSheet(null)}>Cancel</Button>
           </Space>
         </Form.Item>
