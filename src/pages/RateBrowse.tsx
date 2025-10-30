@@ -34,6 +34,13 @@ export default function RateBrowse() {
     setVendors(vendors);
   };
 
+  // Helper function to safely parse number from string
+  const parseNumber = (value: string | number | undefined): number | undefined => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.-]/g, ''));
+    return isNaN(num) ? undefined : num;
+  };
+
   // Convert parsed sheet data to RateBrowseItem format
   const allData = useMemo(() => {
     const items: RateBrowseItem[] = [];
@@ -42,14 +49,37 @@ export default function RateBrowse() {
     parsedSheets.forEach((sheet) => {
       if (sheet.rateCardDetails && sheet.rateCardDetails.length > 0) {
         sheet.rateCardDetails.forEach((detail) => {
+          // Skip rows without essential data
+          if (!detail.country && !detail.weightRange && !detail.rate) {
+            return;
+          }
+
           // Parse weight range
           let weightFrom = 0;
           let weightTo = 0;
           if (detail.weightRange) {
-            const match = detail.weightRange.match(/\[([\d.]+),\s*([\d.]+)\)/);
-            if (match) {
-              weightFrom = parseFloat(match[1]);
-              weightTo = parseFloat(match[2]);
+            // Try to extract numbers from weight range string
+            // Supports formats like: [0.5, 1.0) or 0.5-1.0 or <1.0
+            const bracketMatch = detail.weightRange.match(/\[([\d.]+)\s*[,，]\s*([\d.]+)\)/);
+            const dashMatch = detail.weightRange.match(/([\d.]+)\s*[-~]\s*([\d.]+)/);
+            const lessThanMatch = detail.weightRange.match(/[<＜≤]\s*([\d.]+)/);
+            
+            if (bracketMatch) {
+              weightFrom = parseFloat(bracketMatch[1]);
+              weightTo = parseFloat(bracketMatch[2]);
+            } else if (dashMatch) {
+              weightFrom = parseFloat(dashMatch[1]);
+              weightTo = parseFloat(dashMatch[2]);
+            } else if (lessThanMatch) {
+              weightFrom = 0;
+              weightTo = parseFloat(lessThanMatch[1]);
+            } else {
+              // Try to find any numbers
+              const numbers = detail.weightRange.match(/[\d.]+/g);
+              if (numbers && numbers.length >= 2) {
+                weightFrom = parseFloat(numbers[0]);
+                weightTo = parseFloat(numbers[1]);
+              }
             }
           }
 
@@ -61,15 +91,15 @@ export default function RateBrowse() {
             vendorId: selectedVendorId || 1,
             vendorName: vendors.find(v => v.id === selectedVendorId)?.name || 'Unknown',
             versionCode: 'v1.0.0',
-            country: detail.country || '-',
-            zone: detail.zone || '-',
-            eta: detail.eta || '-',
+            country: detail.country?.trim() || '-',
+            zone: detail.zone?.trim() || '-',
+            eta: detail.eta?.trim() || '-',
             weightFrom,
             weightTo,
-            minChargeableWeight: detail.minChargeableWeight ? parseFloat(detail.minChargeableWeight.toString()) : undefined,
-            price: detail.rate ? parseFloat(detail.rate.toString()) : 0,
+            minChargeableWeight: parseNumber(detail.minChargeableWeight),
+            price: parseNumber(detail.rate) || 0,
             currency: 'RMB',
-            registerFee: detail.registrationFee ? parseFloat(detail.registrationFee.toString()) : undefined,
+            registerFee: parseNumber(detail.registrationFee),
           });
         });
       }
