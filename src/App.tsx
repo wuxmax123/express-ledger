@@ -38,6 +38,7 @@ const App = () => (
               <Route path="/" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/import" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/diff" element={<Layout><RateDiff /></Layout>} />
+              <Route path="/rates/history" element={<Layout><RateHistory /></Layout>} />
               <Route path="/rates/history/:channelId" element={<Layout><RateHistory /></Layout>} />
               <Route path="/rates/browse" element={<Layout><RateBrowse /></Layout>} />
               <Route path="/rates/compare" element={<Layout><RateCompare /></Layout>} />
