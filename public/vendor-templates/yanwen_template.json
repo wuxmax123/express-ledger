@@ -1,0 +1,79 @@
+{
+  "vendor": "Yanwen",
+  "file_patterns": [".*燕文.*", ".*Yanwen.*", ".*yanwen.*"],
+  "sheets": [
+    {
+      "match": {
+        "name_regex": "^(?!.*(目录|总目录|国家维度|偏远|邮编|附加费|清单|服务|分区|说明|税率|紧急|保价|签名)).+$"
+      },
+      "type": "rate_card",
+      "whitelist_keywords": ["燕文", "挂号", "平邮", "专线", "包裹", "小包", "全球"],
+      "header_row_max_search": 8,
+      "meta_extract": {
+        "channel_code": {
+          "source": "sheet_name_or_cell",
+          "row_range": [0, 12],
+          "col_range": [0, 10],
+          "regex": "(?:产品编码|渠道编码|渠道代码|运输代码|Channel Code|Product Code)[:：\\s]*([A-Za-z0-9\\-_/]+)",
+          "fallback_to_sheet_name": true
+        },
+        "channel_name": {
+          "source": "cell_search",
+          "row_range": [0, 12],
+          "col_range": [0, 10],
+          "regex": "(?:产品名称|渠道名称|Channel Name|Product Name)[:：\\s]*([^\\n\\r]+)"
+        },
+        "effective_date": {
+          "source": "cell_search",
+          "row_range": [0, 12],
+          "col_range": [0, 10],
+          "regex": "(?:生效日期|有效期|Effective Date)[:：\\s]*(\\d{4}[/-]\\d{1,2}[/-]\\d{1,2})"
+        }
+      },
+      "header_aliases": {
+        "country": ["国家代码", "国家/地区", "国家", "目的地", "Country", "Destination", "Country Code"],
+        "zone": ["分区", "区域", "分区代码", "Zone"],
+        "eta": ["参考时效", "时效", "派送时效", "ETA", "工作日"],
+        "weight_range": ["重量(KG)", "重量区间", "重量段", "Weight", "Weight Range", "重量"],
+        "weight_from": ["起重", "From(kg)", "下限(kg)", "计费始重"],
+        "weight_to": ["至重", "To(kg)", "上限(kg)", "计费至重"],
+        "rounding_step": ["进位制(KG)", "进位制", "计费进位"],
+        "min_chargeable_weight": ["最低计费重(KG)", "最低计费重", "最低计费重量"],
+        "price_per_kg": ["单价(元/kg)", "单价（元/kg）", "运费(RMB/KG)", "运费(元/KG)", "价格", "单价", "Price", "运费"],
+        "register_fee": ["处理费", "挂号费(RMB/票)", "挂号费", "Register Fee", "挂号费(RMB)"],
+        "currency": ["币种", "Currency"]
+      },
+      "weight_patterns": [
+        "(?P<l>\\d+(\\.\\d+)?)\\s*[<]\\s*W\\s*[<=]\\s*(?P<u>\\d+(\\.\\d+)?)",
+        "^0\\s*[<]\\s*W\\s*[<=]\\s*(?P<u>\\d+(\\.\\d+)?)$",
+        "^(?P<l>\\d+(\\.\\d+)?)\\s*[<]\\s*W\\s*[<=]\\s*MAX$"
+      ],
+      "eta_patterns": [
+        "(\\d+)\\s*-\\s*\\d+",
+        "(\\d+)天",
+        "(\\d+)\\s*day(s)?"
+      ],
+      "text_normalization": {
+        "＜": "<",
+        "≤": "<=",
+        "：": ":",
+        "　": " ",
+        "–": "-",
+        "（": "(",
+        "）": ")"
+      },
+      "confidence_threshold": 70
+    },
+    {
+      "match": {"name_regex": ".*(偏远|附加费|紧急).*"},
+      "type": "surcharge",
+      "header_row_index": 0,
+      "columns": {
+        "postcode": ["邮编", "邮政编码", "ZIP"],
+        "city": ["城市", "City"],
+        "province": ["省/州", "州", "省份"],
+        "note": ["备注", "说明"]
+      }
+    }
+  ]
+}
