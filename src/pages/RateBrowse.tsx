@@ -34,14 +34,7 @@ export default function RateBrowse() {
     setVendors(vendors);
   };
 
-  // Helper function to safely parse number from string
-  const parseNumber = (value: string | number | undefined): number | undefined => {
-    if (value === undefined || value === null || value === '') return undefined;
-    const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.-]/g, ''));
-    return isNaN(num) ? undefined : num;
-  };
-
-  // Convert parsed sheet data to RateBrowseItem format
+  // Convert parsed sheet data to RateBrowseItem format with normalization
   const allData = useMemo(() => {
     const items: RateBrowseItem[] = [];
     let idCounter = 1;
@@ -50,37 +43,8 @@ export default function RateBrowse() {
       if (sheet.rateCardDetails && sheet.rateCardDetails.length > 0) {
         sheet.rateCardDetails.forEach((detail) => {
           // Skip rows without essential data
-          if (!detail.country && !detail.weightRange && !detail.rate) {
+          if (!detail.country && !detail.weightFrom && !detail.price) {
             return;
-          }
-
-          // Parse weight range
-          let weightFrom = 0;
-          let weightTo = 0;
-          if (detail.weightRange) {
-            // Try to extract numbers from weight range string
-            // Supports formats like: [0.5, 1.0) or 0.5-1.0 or <1.0
-            const bracketMatch = detail.weightRange.match(/\[([\d.]+)\s*[,，]\s*([\d.]+)\)/);
-            const dashMatch = detail.weightRange.match(/([\d.]+)\s*[-~]\s*([\d.]+)/);
-            const lessThanMatch = detail.weightRange.match(/[<＜≤]\s*([\d.]+)/);
-            
-            if (bracketMatch) {
-              weightFrom = parseFloat(bracketMatch[1]);
-              weightTo = parseFloat(bracketMatch[2]);
-            } else if (dashMatch) {
-              weightFrom = parseFloat(dashMatch[1]);
-              weightTo = parseFloat(dashMatch[2]);
-            } else if (lessThanMatch) {
-              weightFrom = 0;
-              weightTo = parseFloat(lessThanMatch[1]);
-            } else {
-              // Try to find any numbers
-              const numbers = detail.weightRange.match(/[\d.]+/g);
-              if (numbers && numbers.length >= 2) {
-                weightFrom = parseFloat(numbers[0]);
-                weightTo = parseFloat(numbers[1]);
-              }
-            }
           }
 
           items.push({
@@ -91,22 +55,27 @@ export default function RateBrowse() {
             vendorId: selectedVendorId || 1,
             vendorName: vendors.find(v => v.id === selectedVendorId)?.name || 'Unknown',
             versionCode: 'v1.0.0',
-            country: detail.country?.trim() || '-',
-            zone: detail.zone?.trim() || '-',
-            eta: detail.eta?.trim() || '-',
-            weightFrom,
-            weightTo,
-            minChargeableWeight: parseNumber(detail.minChargeableWeight),
-            price: parseNumber(detail.rate) || 0,
-            currency: 'RMB',
-            registerFee: parseNumber(detail.registrationFee),
+            country: detail.country || '-',
+            zone: detail.zone || '-',
+            eta: detail.etaMinDays ? `${detail.etaMinDays} ${t('common.days')}` : (detail.eta || '-'),
+            weightFrom: detail.weightFrom || 0,
+            weightTo: detail.weightTo || 0,
+            minChargeableWeight: detail.minChargeableWeight,
+            price: detail.price || 0,
+            currency: detail.currency || 'RMB',
+            registerFee: detail.registerFee,
+            // Store raw values for tooltips
+            countryRaw: detail.countryRaw,
+            zoneRaw: detail.zoneRaw,
+            etaRaw: detail.etaRaw,
+            weightRaw: detail.weightRaw,
           });
         });
       }
     });
 
     return items;
-  }, [parsedSheets, selectedVendorId, vendors]);
+  }, [parsedSheets, selectedVendorId, vendors, t]);
 
   // Apply filters
   const filteredData = useMemo(() => {
@@ -189,48 +158,58 @@ export default function RateBrowse() {
       title: t('rateBrowse.country'),
       dataIndex: 'country',
       key: 'country',
-      width: 80,
+      width: 100,
+      render: (text: string, record: RateBrowseItem) => (
+        <span title={record.countryRaw || text}>{text || '-'}</span>
+      ),
     },
     {
       title: t('rateBrowse.zone'),
       dataIndex: 'zone',
       key: 'zone',
       width: 80,
-      render: (text: string) => text || '-',
+      render: (text: string, record: RateBrowseItem) => (
+        <span title={record.zoneRaw || text}>{text || '-'}</span>
+      ),
     },
     {
       title: t('rateBrowse.eta'),
       dataIndex: 'eta',
       key: 'eta',
       width: 120,
-      render: (text: string) => text || '-',
+      render: (text: string, record: RateBrowseItem) => (
+        <span title={record.etaRaw || text}>{text || '-'}</span>
+      ),
     },
     {
       title: t('rateBrowse.weight'),
       key: 'weight',
-      width: 120,
-      render: (_: any, record: RateBrowseItem) => `[${record.weightFrom}, ${record.weightTo}) kg`,
+      width: 140,
+      render: (_: any, record: RateBrowseItem) => {
+        const display = `[${record.weightFrom}, ${record.weightTo}) kg`;
+        return <span title={record.weightRaw || display}>{display}</span>;
+      },
     },
     {
       title: t('rateBrowse.minWeight'),
       dataIndex: 'minChargeableWeight',
       key: 'minChargeableWeight',
-      width: 100,
-      render: (text: number) => text ? `${text} kg` : '-',
+      width: 120,
+      render: (text: number) => text ? `${text.toFixed(3)} kg` : '-',
     },
     {
       title: t('rateBrowse.price'),
       dataIndex: 'price',
       key: 'price',
-      width: 100,
-      render: (text: number, record: RateBrowseItem) => `${text} ${record.currency}`,
+      width: 120,
+      render: (text: number, record: RateBrowseItem) => `${text.toFixed(2)} ${record.currency}`,
     },
     {
       title: t('rateBrowse.registerFee'),
       dataIndex: 'registerFee',
       key: 'registerFee',
-      width: 100,
-      render: (text: number, record: RateBrowseItem) => text ? `${text} ${record.currency}` : '-',
+      width: 120,
+      render: (text: number, record: RateBrowseItem) => text ? `${text.toFixed(2)} ${record.currency}` : '-',
     },
   ];
 

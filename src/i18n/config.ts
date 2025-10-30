@@ -129,6 +129,7 @@ const resources = {
       'common.active': 'Active',
       'common.inactive': 'Inactive',
       'common.loading': 'Loading...',
+      'common.days': 'days',
     }
   },
   zh: {
@@ -258,6 +259,7 @@ const resources = {
       'common.active': '激活',
       'common.inactive': '未激活',
       'common.loading': '加载中...',
+      'common.days': '天',
     }
   }
 };

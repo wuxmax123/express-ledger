@@ -111,13 +111,21 @@ export interface DetectionLog {
 }
 
 export interface RateCardDetail {
+  // Normalized fields
   country?: string;
+  countryRaw?: string;
   zone?: string;
-  eta?: string; // 时效
-  weightRange?: string;
-  minChargeableWeight?: string;
-  rate?: string; // 运费
-  registrationFee?: string; // 挂号费
+  zoneRaw?: string;
+  eta?: string;
+  etaRaw?: string;
+  etaMinDays?: number;
+  weightFrom?: number;
+  weightTo?: number;
+  weightRaw?: string;
+  minChargeableWeight?: number;
+  price?: number;
+  registerFee?: number;
+  currency?: string;
 }
 
 // Rate Browse & Compare types
@@ -138,6 +146,11 @@ export interface RateBrowseItem {
   price: number;
   currency: string;
   registerFee?: number;
+  // Raw values for tooltips
+  countryRaw?: string;
+  zoneRaw?: string;
+  etaRaw?: string;
+  weightRaw?: string;
 }
 
 export interface RateBrowseParams {

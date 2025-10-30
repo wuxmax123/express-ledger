@@ -1,22 +1,214 @@
 import * as XLSX from 'xlsx';
 import { ParsedSheetData, StructureChangeLevel, DetectionVerdict, DetectionLog, RateCardDetail } from '@/types';
 
-// Text normalization - enhanced for full-width characters
+// Comprehensive text normalization for full-width characters
 const normalizeText = (text: string): string => {
   return text
+    // Full-width punctuation to half-width
     .replace(/＜/g, '<')
+    .replace(/＞/g, '>')
     .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
     .replace(/：/g, ':')
     .replace(/（/g, '(')
     .replace(/）/g, ')')
     .replace(/【/g, '[')
     .replace(/】/g, ']')
+    .replace(/，/g, ',')
+    .replace(/。/g, '.')
+    .replace(/、/g, ',')
+    .replace(/～/g, '-')
+    .replace(/–/g, '-')
+    .replace(/—/g, '-')
+    .replace(/　/g, ' ')
     // Normalize full-width alphanumeric to half-width
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => {
       return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
     })
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+// Country name normalization dictionary
+const COUNTRY_NORMALIZATION: Record<string, string> = {
+  // Chinese to ISO-2
+  '美国': 'US',
+  '美國': 'US',
+  '加拿大': 'CA',
+  '英国': 'GB',
+  '英國': 'GB',
+  '法国': 'FR',
+  '法國': 'FR',
+  '德国': 'DE',
+  '德國': 'DE',
+  '西班牙': 'ES',
+  '意大利': 'IT',
+  '澳大利亚': 'AU',
+  '澳洲': 'AU',
+  '日本': 'JP',
+  '韩国': 'KR',
+  '韓國': 'KR',
+  '巴西': 'BR',
+  '墨西哥': 'MX',
+  '阿联酋': 'AE',
+  '沙特': 'SA',
+  '沙特阿拉伯': 'SA',
+  '新加坡': 'SG',
+  '泰国': 'TH',
+  '泰國': 'TH',
+  '马来西亚': 'MY',
+  '马来': 'MY',
+  '菲律宾': 'PH',
+  '印度尼西亚': 'ID',
+  '印尼': 'ID',
+  '越南': 'VN',
+  '中国': 'CN',
+  '中國': 'CN',
+  // English variants
+  'united states': 'US',
+  'usa': 'US',
+  'united kingdom': 'GB',
+  'uk': 'GB',
+  'canada': 'CA',
+  'france': 'FR',
+  'germany': 'DE',
+  'spain': 'ES',
+  'italy': 'IT',
+  'australia': 'AU',
+  'japan': 'JP',
+  'korea': 'KR',
+  'south korea': 'KR',
+  'brazil': 'BR',
+  'mexico': 'MX',
+  'uae': 'AE',
+  'saudi arabia': 'SA',
+  'singapore': 'SG',
+  'thailand': 'TH',
+  'malaysia': 'MY',
+  'philippines': 'PH',
+  'indonesia': 'ID',
+  'vietnam': 'VN',
+  'china': 'CN',
+};
+
+// Normalize country name
+const normalizeCountry = (raw: string): { normalized: string; raw: string } => {
+  const trimmed = raw.trim();
+  const key = normalizeText(trimmed).toLowerCase();
+  
+  // Check if it's a region pattern (contains parentheses with exclusions)
+  if (/[\(（].*[不除].*[\)）]/.test(trimmed)) {
+    return { normalized: trimmed, raw: trimmed }; // Keep as region
+  }
+  
+  const normalized = COUNTRY_NORMALIZATION[key] || trimmed;
+  return { normalized, raw: trimmed };
+};
+
+// Normalize zone (extract number/letter from zone strings)
+const normalizeZone = (raw: string): { normalized: string; raw: string } => {
+  if (!raw) return { normalized: '', raw: '' };
+  
+  const trimmed = raw.trim();
+  const normalized = normalizeText(trimmed);
+  
+  // Extract zone number/letter: 1区 → 1, Zone-2 → 2, A区 → A
+  const match = normalized.match(/(?:zone[- ]?)?([a-z0-9]+)(?:区)?/i);
+  if (match) {
+    return { normalized: match[1].toUpperCase(), raw: trimmed };
+  }
+  
+  return { normalized: trimmed, raw: trimmed };
+};
+
+// Parse ETA to extract minimum days
+const parseETA = (raw: string): { etaMinDays: number | undefined; etaRaw: string } => {
+  if (!raw) return { etaMinDays: undefined, etaRaw: '' };
+  
+  const trimmed = raw.trim();
+  const normalized = normalizeText(trimmed);
+  
+  // Pattern: "5-10工作日" → 5, "7-14天" → 7
+  const rangeMatch = normalized.match(/(\d+)\s*[-~]\s*(\d+)/);
+  if (rangeMatch) {
+    return { etaMinDays: parseInt(rangeMatch[1]), etaRaw: trimmed };
+  }
+  
+  // Pattern: "7工作日" → 7
+  const singleMatch = normalized.match(/(\d+)/);
+  if (singleMatch) {
+    return { etaMinDays: parseInt(singleMatch[1]), etaRaw: trimmed };
+  }
+  
+  return { etaMinDays: undefined, etaRaw: trimmed };
+};
+
+// Parse weight range from string
+const parseWeightRange = (raw: string): { weightFrom: number; weightTo: number; weightRaw: string } | null => {
+  if (!raw) return null;
+  
+  const trimmed = raw.trim();
+  const normalized = normalizeText(trimmed);
+  
+  // Pattern: "0<W<=0.3" or "0 < W <= 0.3"
+  let match = normalized.match(/([\d.]+)\s*<\s*W\s*<=?\s*([\d.]+)/i);
+  if (match) {
+    return {
+      weightFrom: parseFloat(match[1]),
+      weightTo: parseFloat(match[2]),
+      weightRaw: trimmed
+    };
+  }
+  
+  // Pattern: "[0.5, 1.0)" or "[0.5,1.0)"
+  match = normalized.match(/\[\s*([\d.]+)\s*[,，]\s*([\d.]+)\s*\)/);
+  if (match) {
+    return {
+      weightFrom: parseFloat(match[1]),
+      weightTo: parseFloat(match[2]),
+      weightRaw: trimmed
+    };
+  }
+  
+  // Pattern: "0.5-1.0" or "0.5~1.0"
+  match = normalized.match(/([\d.]+)\s*[-~]\s*([\d.]+)/);
+  if (match) {
+    return {
+      weightFrom: parseFloat(match[1]),
+      weightTo: parseFloat(match[2]),
+      weightRaw: trimmed
+    };
+  }
+  
+  // Pattern: "<0.3" or "≤0.3" (open low)
+  match = normalized.match(/^0?\s*[<≤]\s*(?:W\s*[<≤]\s*)?([\d.]+)/);
+  if (match) {
+    return {
+      weightFrom: 0,
+      weightTo: parseFloat(match[1]),
+      weightRaw: trimmed
+    };
+  }
+  
+  // Pattern: ">5" or "5<W" (open high)
+  match = normalized.match(/([\d.]+)\s*<(?:\s*W)?(?:\s*<=?\s*(?:MAX|∞))?$/i);
+  if (match) {
+    return {
+      weightFrom: parseFloat(match[1]),
+      weightTo: 999999,
+      weightRaw: trimmed
+    };
+  }
+  
+  return null;
+};
+
+// Safe number parsing
+const parseNumber = (value: any): number | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const str = String(value).replace(/[^\d.-]/g, '');
+  const num = parseFloat(str);
+  return isNaN(num) ? undefined : num;
 };
 
 // Sheet blacklist patterns
@@ -99,98 +291,198 @@ const parseDirectorySheet = (workbook: XLSX.WorkBook): Map<string, { productName
   return directoryMap;
 };
 
-// Parse rate card details from sheet
-const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
-  const details: RateCardDetail[] = [];
+// Enhanced header detection with alias sets
+const COLUMN_ALIASES = {
+  country: ['国家/地区', '国家', '目的地', 'Country', 'Destination'],
+  zone: ['分区', '区域', '分区代码', 'Zone', 'Area'],
+  eta: ['参考时效', '时效', '派送时效', 'ETA', 'Delivery Time', '交货时间'],
+  weightRange: ['重量(KG)', '重量区间', '重量段', 'Weight', 'Weight Range', '重量范围'],
+  weightFrom: ['起重', 'From(kg)', '下限(kg)', 'Weight From', '起始重量'],
+  weightTo: ['至重', 'To(kg)', '上限(kg)', 'Weight To', '结束重量'],
+  minWeight: ['最低计费重(KG)', '最低计费重', '最低计费重量', 'Min Weight', 'Minimum Chargeable Weight', '最小计费重'],
+  price: ['运费(RMB/KG)', '运费(元/KG)', '价格', '运费', 'Rate', 'Price', '单价'],
+  registerFee: ['挂号费(RMB/票)', '挂号费', '处理费', 'Registration Fee', 'Handling Fee', '挂号费用'],
+  currency: ['币种', 'Currency'],
+  roundingStep: ['进位制(KG)', '进位制', '计费进位', 'Increment', 'Rounding']
+};
+
+// Check if a cell matches any alias in a set
+const matchesAlias = (cellValue: string, aliases: string[]): boolean => {
+  const normalized = normalizeText(cellValue).toLowerCase();
+  return aliases.some(alias => {
+    const normalizedAlias = normalizeText(alias).toLowerCase();
+    return normalized === normalizedAlias || normalized.includes(normalizedAlias);
+  });
+};
+
+// Detect header row by finding row with maximum alias hits
+const detectHeaderRow = (jsonData: any[][], maxScanRows: number = 8): {
+  headerRowIndex: number;
+  columnMap: Map<string, number>;
+} => {
+  let bestRowIndex = -1;
+  let bestMatchCount = 0;
+  let bestColumnMap = new Map<string, number>();
   
-  // Column mapping patterns
-  const columnPatterns = {
-    country: /(国家\/地区|国家|目的地|Country|Destination)/i,
-    zone: /(分区|区域|分区代码|Zone|Area)/i,
-    eta: /(参考时效|时效|派送时效|ETA|Delivery Time)/i,
-    weightRange: /(重量\(KG\)|重量区间|重量段|Weight|Weight Range)/i,
-    minWeight: /(最低计费重\(KG\)|最低计费重|最低计费重量|Min Weight|Minimum Chargeable Weight)/i,
-    rate: /(运费\(RMB\/KG\)|运费\(元\/KG\)|价格|运费|Rate|Price)/i,
-    registrationFee: /(挂号费\(RMB\/票\)|挂号费|处理费|Registration Fee|Handling Fee)/i,
-    increment: /(进位制\(KG\)|进位制|计费进位|Increment)/i
-  };
+  const scanRows = Math.min(maxScanRows, jsonData.length);
   
-  // Find header row and column indices
-  let headerRowIndex = -1;
-  const columnIndices: Record<string, number> = {};
-  
-  const maxRows = Math.min(20, jsonData.length);
-  for (let r = 0; r < maxRows; r++) {
+  for (let r = 0; r < scanRows; r++) {
     const row = jsonData[r];
     if (!row) continue;
     
     let matchCount = 0;
-    const tempIndices: Record<string, number> = {};
+    const columnMap = new Map<string, number>();
     
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
-      if (typeof cell === 'string') {
-        const normalized = normalizeText(cell);
-        
-        for (const [key, pattern] of Object.entries(columnPatterns)) {
-          if (pattern.test(normalized)) {
-            tempIndices[key] = c;
+      if (typeof cell === 'string' && cell.trim()) {
+        // Check against each alias set
+        for (const [fieldName, aliases] of Object.entries(COLUMN_ALIASES)) {
+          if (matchesAlias(cell, aliases)) {
+            columnMap.set(fieldName, c);
             matchCount++;
+            break; // Only count each cell once
           }
         }
       }
     }
     
-    // If we found at least 3 columns, consider this the header row
-    if (matchCount >= 3) {
-      headerRowIndex = r;
-      Object.assign(columnIndices, tempIndices);
-      break;
+    // Update best match if this row has more matches
+    if (matchCount > bestMatchCount && matchCount >= 3) {
+      bestMatchCount = matchCount;
+      bestRowIndex = r;
+      bestColumnMap = columnMap;
     }
   }
   
-  // Extract data rows
-  if (headerRowIndex >= 0 && Object.keys(columnIndices).length >= 3) {
-    const dataStartRow = headerRowIndex + 1;
-    const maxDataRows = Math.min(100, jsonData.length); // Limit to first 100 data rows for preview
-    
-    for (let r = dataStartRow; r < maxDataRows; r++) {
-      const row = jsonData[r];
-      if (!row) continue;
-      
-      // Skip empty rows
-      const hasData = row.some(cell => cell !== undefined && cell !== null && cell !== '');
-      if (!hasData) continue;
-      
-      const detail: RateCardDetail = {};
-      
-      if (columnIndices.country !== undefined) {
-        detail.country = String(row[columnIndices.country] || '');
-      }
-      if (columnIndices.zone !== undefined) {
-        detail.zone = String(row[columnIndices.zone] || '');
-      }
-      if (columnIndices.eta !== undefined) {
-        detail.eta = String(row[columnIndices.eta] || '');
-      }
-      if (columnIndices.weightRange !== undefined) {
-        detail.weightRange = String(row[columnIndices.weightRange] || '');
-      }
-      if (columnIndices.minWeight !== undefined) {
-        detail.minChargeableWeight = String(row[columnIndices.minWeight] || '');
-      }
-      if (columnIndices.rate !== undefined) {
-        detail.rate = String(row[columnIndices.rate] || '');
-      }
-      if (columnIndices.registrationFee !== undefined) {
-        detail.registrationFee = String(row[columnIndices.registrationFee] || '');
-      }
-      
-      // Only add if at least country or weightRange exists
-      if (detail.country || detail.weightRange) {
-        details.push(detail);
+  return { headerRowIndex: bestRowIndex, columnMap: bestColumnMap };
+};
+
+// Check if a row is a repeated header (contains multiple header aliases)
+const isRepeatedHeader = (row: any[], columnMap: Map<string, number>): boolean => {
+  if (!row) return false;
+  
+  let headerMatches = 0;
+  for (let c = 0; c < row.length; c++) {
+    const cell = row[c];
+    if (typeof cell === 'string' && cell.trim()) {
+      for (const aliases of Object.values(COLUMN_ALIASES)) {
+        if (matchesAlias(cell, aliases)) {
+          headerMatches++;
+          break;
+        }
       }
     }
+  }
+  
+  return headerMatches >= 3;
+};
+
+// Parse rate card details with robust header detection and normalization
+const parseRateCardDetails = (jsonData: any[][]): RateCardDetail[] => {
+  const details: RateCardDetail[] = [];
+  
+  // Detect header row
+  const { headerRowIndex, columnMap } = detectHeaderRow(jsonData);
+  
+  if (headerRowIndex < 0 || columnMap.size < 3) {
+    return details; // Not enough columns detected
+  }
+  
+  // Extract data rows
+  const dataStartRow = headerRowIndex + 1;
+  const maxDataRows = Math.min(150, jsonData.length); // Increased limit for preview
+  const seenRows = new Set<string>(); // For deduplication
+  
+  for (let r = dataStartRow; r < maxDataRows; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    
+    // Skip rows that repeat the header
+    if (isRepeatedHeader(row, columnMap)) {
+      continue;
+    }
+    
+    // Skip empty rows
+    const hasData = row.some(cell => cell !== undefined && cell !== null && cell !== '');
+    if (!hasData) continue;
+    
+    // Extract raw values
+    const countryRaw = columnMap.has('country') ? String(row[columnMap.get('country')!] || '').trim() : '';
+    const zoneRaw = columnMap.has('zone') ? String(row[columnMap.get('zone')!] || '').trim() : '';
+    const etaRaw = columnMap.has('eta') ? String(row[columnMap.get('eta')!] || '').trim() : '';
+    const weightRangeRaw = columnMap.has('weightRange') ? String(row[columnMap.get('weightRange')!] || '').trim() : '';
+    const weightFromRaw = columnMap.has('weightFrom') ? row[columnMap.get('weightFrom')!] : undefined;
+    const weightToRaw = columnMap.has('weightTo') ? row[columnMap.get('weightTo')!] : undefined;
+    const minWeightRaw = columnMap.has('minWeight') ? row[columnMap.get('minWeight')!] : undefined;
+    const priceRaw = columnMap.has('price') ? row[columnMap.get('price')!] : undefined;
+    const registerFeeRaw = columnMap.has('registerFee') ? row[columnMap.get('registerFee')!] : undefined;
+    const currencyRaw = columnMap.has('currency') ? String(row[columnMap.get('currency')!] || '').trim() : '';
+    
+    // Skip if no essential data
+    if (!countryRaw && !weightRangeRaw && !weightFromRaw && !priceRaw) {
+      continue;
+    }
+    
+    // Normalize country
+    const { normalized: country, raw: countryRawFinal } = countryRaw ? normalizeCountry(countryRaw) : { normalized: '', raw: '' };
+    
+    // Normalize zone
+    const { normalized: zone, raw: zoneRawFinal } = zoneRaw ? normalizeZone(zoneRaw) : { normalized: '', raw: '' };
+    
+    // Parse ETA
+    const { etaMinDays, etaRaw: etaRawFinal } = etaRaw ? parseETA(etaRaw) : { etaMinDays: undefined, etaRaw: '' };
+    
+    // Parse weight range
+    let weightFrom: number | undefined;
+    let weightTo: number | undefined;
+    let weightRawFinal = '';
+    
+    if (weightRangeRaw) {
+      const parsed = parseWeightRange(weightRangeRaw);
+      if (parsed) {
+        weightFrom = parsed.weightFrom;
+        weightTo = parsed.weightTo;
+        weightRawFinal = parsed.weightRaw;
+      }
+    } else if (weightFromRaw !== undefined && weightToRaw !== undefined) {
+      weightFrom = parseNumber(weightFromRaw);
+      weightTo = parseNumber(weightToRaw);
+      weightRawFinal = `${weightFrom}-${weightTo}`;
+    }
+    
+    // Parse numeric fields
+    const minChargeableWeight = parseNumber(minWeightRaw);
+    const price = parseNumber(priceRaw);
+    const registerFee = parseNumber(registerFeeRaw);
+    const currency = currencyRaw || 'RMB';
+    
+    // Deduplication key
+    const dedupKey = `${country}|${zone}|${weightFrom}|${weightTo}`;
+    if (seenRows.has(dedupKey)) {
+      continue; // Skip duplicate
+    }
+    seenRows.add(dedupKey);
+    
+    // Create detail object
+    const detail: RateCardDetail = {
+      country,
+      countryRaw: countryRawFinal,
+      zone,
+      zoneRaw: zoneRawFinal,
+      eta: etaRawFinal,
+      etaRaw: etaRawFinal,
+      etaMinDays,
+      weightFrom,
+      weightTo,
+      weightRaw: weightRawFinal,
+      minChargeableWeight,
+      price,
+      registerFee,
+      currency
+    };
+    
+    details.push(detail);
   }
   
   return details;
