@@ -25,6 +25,80 @@ const SHEET_BLACKLIST = /(报价总目录|目录国家维度|偏远|邮编|附�
 // Sheet whitelist for YunExpress
 const YUNEXPRESS_WHITELIST = /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/;
 
+// Parse directory sheet to extract channel code mappings
+const parseDirectorySheet = (workbook: XLSX.WorkBook): Map<string, { productName: string; channelCode: string }> => {
+  const directoryMap = new Map<string, { productName: string; channelCode: string }>();
+  
+  // Look for directory sheet (报价总目录, 目录, Directory)
+  const directorySheetName = workbook.SheetNames.find(name => 
+    /(报价总目录|^目录$|Directory)/i.test(name)
+  );
+  
+  if (!directorySheetName) return directoryMap;
+  
+  const worksheet = workbook.Sheets[directorySheetName];
+  const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+  
+  // Find header row with 产品名称 and 运输代码
+  let headerRowIndex = -1;
+  let productNameCol = -1;
+  let channelCodeCol = -1;
+  
+  for (let r = 0; r < Math.min(10, jsonData.length); r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === 'string') {
+        const normalized = normalizeText(cell);
+        if (/(产品名称|Product Name)/i.test(normalized)) {
+          productNameCol = c;
+          headerRowIndex = r;
+        }
+        if (/(运输代码|渠道代码|Channel Code)/i.test(normalized)) {
+          channelCodeCol = c;
+          headerRowIndex = r;
+        }
+      }
+    }
+    
+    if (productNameCol >= 0 && channelCodeCol >= 0) break;
+  }
+  
+  // Extract mappings
+  if (headerRowIndex >= 0 && productNameCol >= 0 && channelCodeCol >= 0) {
+    for (let r = headerRowIndex + 1; r < jsonData.length; r++) {
+      const row = jsonData[r];
+      if (!row) continue;
+      
+      const productName = row[productNameCol];
+      const channelCode = row[channelCodeCol];
+      
+      if (productName && channelCode && typeof channelCode === 'string') {
+        const normalizedCode = normalizeText(channelCode).toUpperCase();
+        if (normalizedCode.length >= 4) {
+          // Use both the code and normalized product name as keys
+          directoryMap.set(normalizedCode, {
+            productName: String(productName),
+            channelCode: normalizedCode
+          });
+          // Also map by product name for fuzzy matching
+          if (typeof productName === 'string') {
+            const normalizedName = normalizeText(productName).toLowerCase();
+            directoryMap.set(normalizedName, {
+              productName: String(productName),
+              channelCode: normalizedCode
+            });
+          }
+        }
+      }
+    }
+  }
+  
+  return directoryMap;
+};
+
 export const parseExcelFile = async (file: File, checkHistory: (channelCode: string) => Promise<boolean>): Promise<ParsedSheetData[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -33,6 +107,9 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
+        
+        // Parse directory sheet first for channel code cross-reference
+        const directoryMap = parseDirectorySheet(workbook);
         
         const sheets: ParsedSheetData[] = await Promise.all(
           workbook.SheetNames.map(async (sheetName, index) => {
@@ -67,6 +144,30 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
             let sheetType = 'OTHER';
             let channelCode = detection.channelCode || '';
             let effectiveDate = detection.effectiveDate;
+            
+            // Cross-reference with directory sheet if no code was detected
+            if (!channelCode && directoryMap.size > 0) {
+              // Try to find by sheet name
+              const sheetNameNorm = normalizeText(sheetName).toLowerCase();
+              const directoryEntry = directoryMap.get(sheetNameNorm);
+              if (directoryEntry) {
+                channelCode = directoryEntry.channelCode;
+                detection.verdict = 'rate';
+                detection.log.reason = `Channel code found via directory cross-reference: ${channelCode}`;
+                detection.totalScore = 100;
+              } else {
+                // Try fuzzy matching with product names in directory
+                for (const [key, value] of directoryMap.entries()) {
+                  if (key.length > 4 && sheetNameNorm.includes(key)) {
+                    channelCode = value.channelCode;
+                    detection.verdict = 'rate';
+                    detection.log.reason = `Channel code found via directory fuzzy match: ${channelCode}`;
+                    detection.totalScore = 100;
+                    break;
+                  }
+                }
+              }
+            }
             
             if (detection.verdict === 'rate') {
               sheetType = 'RATE_CARD';
