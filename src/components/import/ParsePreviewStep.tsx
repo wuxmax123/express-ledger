@@ -98,6 +98,21 @@ export const ParsePreviewStep = () => {
     );
   };
   
+  const handleSkipMapping = (sheetName: string) => {
+    setParsedSheets(parsedSheets.map(sheet => {
+      if (sheet.sheetName === sheetName) {
+        return {
+          ...sheet,
+          needsMapping: false,
+          detectionVerdict: 'rate', // Mark as rate card to allow processing
+          confidence: 50 // Lower confidence since we skipped mapping
+        };
+      }
+      return sheet;
+    }));
+    setMappingSheet(null);
+  };
+  
   const handleSkipSheet = (sheetName: string) => {
     setParsedSheets(parsedSheets.map(sheet => {
       if (sheet.sheetName === sheetName) {
@@ -422,6 +437,7 @@ export const ParsePreviewStep = () => {
           availableColumns={getAvailableColumns(mappingSheet)}
           onConfirm={(mapping) => handleColumnMapping(mappingSheet.sheetName, mapping)}
           onCancel={() => setMappingSheet(null)}
+          onSkip={() => handleSkipMapping(mappingSheet.sheetName)}
         />
       )}
       

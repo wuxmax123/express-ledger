@@ -10,6 +10,7 @@ interface ColumnMappingDialogProps {
   availableColumns: string[];
   onConfirm: (mapping: { [key: string]: number }) => void;
   onCancel: () => void;
+  onSkip?: () => void;
 }
 
 const REQUIRED_FIELDS = {
@@ -32,6 +33,7 @@ export const ColumnMappingDialog = ({
   availableColumns,
   onConfirm,
   onCancel,
+  onSkip,
 }: ColumnMappingDialogProps) => {
   const [mapping, setMapping] = useState<{ [key: string]: number }>({});
 
@@ -43,16 +45,15 @@ export const ColumnMappingDialog = ({
   };
 
   const handleConfirm = () => {
-    // Validate required fields
-    const missingFields = Object.keys(REQUIRED_FIELDS).filter(
-      (field) => mapping[field] === undefined
-    );
-
-    if (missingFields.length > 0) {
-      return; // Could show error message
-    }
-
     onConfirm(mapping);
+  };
+
+  const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+    } else {
+      onCancel();
+    }
   };
 
   const allRequiredMapped = Object.keys(REQUIRED_FIELDS).every(
@@ -68,6 +69,9 @@ export const ColumnMappingDialog = ({
       footer={[
         <Button key="cancel" onClick={onCancel}>
           Cancel
+        </Button>,
+        <Button key="skip" onClick={handleSkip}>
+          Skip Mapping
         </Button>,
         <Button
           key="confirm"
