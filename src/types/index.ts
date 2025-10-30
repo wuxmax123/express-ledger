@@ -99,6 +99,17 @@ export interface RateDiff {
   deltaPct: number;
 }
 
+export type DetectionVerdict = 'rate' | 'uncertain' | 'skipped';
+
+export interface DetectionLog {
+  headerSignal?: { found: boolean; channelCode?: string; effectiveDate?: string; points: number };
+  columnSignal?: { matchedHeaders: string[]; points: number };
+  weightSignal?: { found: boolean; samples: string[]; points: number };
+  totalScore: number;
+  verdict: DetectionVerdict;
+  reason: string;
+}
+
 export interface ParsedSheetData {
   sheetName: string;
   sheetType: string;
@@ -109,4 +120,13 @@ export interface ParsedSheetData {
   structureChangeMessage?: string;
   isFirstVersion?: boolean;
   hasHistoricalVersion?: boolean;
+  detectionScore?: number;
+  detectionVerdict?: DetectionVerdict;
+  detectionLog?: DetectionLog;
+  action?: string; // 'import' | 'skip'
+  manualAnnotation?: {
+    productName?: string;
+    channelCode?: string;
+    effectiveDate?: string;
+  };
 }

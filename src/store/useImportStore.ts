@@ -7,7 +7,7 @@ interface ImportState {
   selectedVendorId: number | null;
   currentStep: number;
   setCurrentJob: (job: ImportJob | null) => void;
-  setParsedSheets: (sheets: ParsedSheetData[]) => void;
+  setParsedSheets: (sheets: ParsedSheetData[] | ((prev: ParsedSheetData[]) => ParsedSheetData[])) => void;
   setSelectedVendorId: (id: number | null) => void;
   setCurrentStep: (step: number) => void;
   updateSheetAction: (sheetName: string, action: string) => void;
@@ -20,7 +20,9 @@ export const useImportStore = create<ImportState>((set) => ({
   selectedVendorId: null,
   currentStep: 0,
   setCurrentJob: (job) => set({ currentJob: job }),
-  setParsedSheets: (sheets) => set({ parsedSheets: sheets }),
+  setParsedSheets: (sheets) => set((state) => ({
+    parsedSheets: typeof sheets === 'function' ? sheets(state.parsedSheets) : sheets
+  })),
   setSelectedVendorId: (id) => set({ selectedVendorId: id }),
   setCurrentStep: (step) => set({ currentStep: step }),
   updateSheetAction: (sheetName, action) => set((state) => ({

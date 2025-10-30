@@ -1,5 +1,21 @@
 import * as XLSX from 'xlsx';
-import { ParsedSheetData, StructureChangeLevel } from '@/types';
+import { ParsedSheetData, StructureChangeLevel, DetectionVerdict, DetectionLog } from '@/types';
+
+// Text normalization
+const normalizeText = (text: string): string => {
+  return text
+    .replace(/＜/g, '<')
+    .replace(/≤/g, '<=')
+    .replace(/：/g, ':')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Sheet blacklist patterns
+const SHEET_BLACKLIST = /(报价总目录|目录国家维度|偏远|邮编|附加费|清单|服务|分区|说明|税率|HPRA|药事法|紧急|保价|签名)/;
+
+// Sheet whitelist for YunExpress
+const YUNEXPRESS_WHITELIST = /(云途).*(挂号|平邮|专线|大货|服装|化妆|全球)/;
 
 export const parseExcelFile = async (file: File, checkHistory: (channelCode: string) => Promise<boolean>): Promise<ParsedSheetData[]> => {
   return new Promise((resolve, reject) => {
@@ -13,20 +29,51 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
         const sheets: ParsedSheetData[] = await Promise.all(
           workbook.SheetNames.map(async (sheetName, index) => {
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            let jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
             
-            // Detect sheet type
-            const sheetType = detectSheetType(sheetName);
-            const channelCode = extractChannelCode(sheetName, jsonData);
+            // Forward-fill merged cells in first 3 rows
+            jsonData = forwardFillMergedCells(jsonData, 3);
+            
+            // Check blacklist/whitelist
+            if (SHEET_BLACKLIST.test(sheetName)) {
+              return {
+                sheetName,
+                sheetType: 'OTHER',
+                rows: jsonData,
+                detectionScore: 0,
+                detectionVerdict: 'skipped' as DetectionVerdict,
+                detectionLog: {
+                  totalScore: 0,
+                  verdict: 'skipped' as DetectionVerdict,
+                  reason: 'Sheet name matches blacklist pattern'
+                },
+                isFirstVersion: true,
+                action: 'skip'
+              };
+            }
+            
+            // Run three-signal detector
+            const detection = runThreeSignalDetector(sheetName, jsonData);
+            
+            // Determine sheet type and channel code
+            let sheetType = 'OTHER';
+            let channelCode = detection.channelCode || '';
+            let effectiveDate = detection.effectiveDate;
+            
+            if (detection.verdict === 'rate') {
+              sheetType = 'RATE_CARD';
+            } else if (detection.verdict === 'uncertain') {
+              sheetType = 'UNCERTAIN';
+            }
             
             // Check if this channel has historical versions
-            const hasHistoricalVersion = await checkHistory(channelCode);
+            const hasHistoricalVersion = channelCode ? await checkHistory(channelCode) : false;
             
             // Only perform structure validation if there's a historical version
             let structureChangeLevel: StructureChangeLevel | undefined;
             let structureChangeMessage: string | undefined;
             
-            if (hasHistoricalVersion) {
+            if (hasHistoricalVersion && channelCode) {
               const { ranges: currentRanges, signature: currentSig } = computeStructureSignature(jsonData);
               const storageKey = `channelStructure:${channelCode}`;
               let prevSig: string | null = null;
@@ -59,10 +106,15 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
               sheetType,
               rows: jsonData,
               channelCode,
+              effectiveDate,
               structureChangeLevel,
               structureChangeMessage,
               hasHistoricalVersion,
-              isFirstVersion: !hasHistoricalVersion
+              isFirstVersion: !hasHistoricalVersion,
+              detectionScore: detection.totalScore,
+              detectionVerdict: detection.verdict,
+              detectionLog: detection.log,
+              action: detection.verdict === 'skipped' ? 'skip' : 'import'
             };
           })
         );
@@ -78,52 +130,209 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
   });
 };
 
-const detectSheetType = (sheetName: string): string => {
-  if (sheetName.includes('目录') || sheetName.toLowerCase().includes('index')) {
-    return 'OTHER';
+// Forward-fill merged cells
+const forwardFillMergedCells = (jsonData: any[][], rows: number): any[][] => {
+  const maxRows = Math.min(rows, jsonData.length);
+  for (let r = 0; r < maxRows; r++) {
+    if (!jsonData[r]) continue;
+    let lastValue: any = null;
+    for (let c = 0; c < jsonData[r].length; c++) {
+      if (jsonData[r][c] !== undefined && jsonData[r][c] !== null && jsonData[r][c] !== '') {
+        lastValue = jsonData[r][c];
+      } else if (lastValue !== null) {
+        jsonData[r][c] = lastValue;
+      }
+    }
   }
-  if (sheetName.includes('偏远') || sheetName.includes('附加费') || sheetName.includes('燃油')) {
-    return 'SURCHARGE';
-  }
-  return 'RATE_CARD';
+  return jsonData;
 };
 
-const extractChannelCode = (sheetName: string, jsonData: any[]): string => {
-  // Try from sheet name first (letters + digits, more flexible)
-  const matchName = sheetName.match(/[A-Za-z]{2,}\d{2,}/);
-  if (matchName) return matchName[0].toUpperCase();
+// Three-signal detector
+const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
+  totalScore: number;
+  verdict: DetectionVerdict;
+  channelCode?: string;
+  effectiveDate?: string;
+  log: DetectionLog;
+} => {
+  let totalScore = 0;
+  const log: DetectionLog = {
+    totalScore: 0,
+    verdict: 'uncertain',
+    reason: ''
+  };
+  
+  // Check whitelist first
+  if (YUNEXPRESS_WHITELIST.test(sheetName)) {
+    totalScore = 100;
+    log.totalScore = 100;
+    log.verdict = 'rate';
+    log.reason = 'Sheet name matches YunExpress whitelist pattern';
+    return { totalScore, verdict: 'rate', log };
+  }
+  
+  // Signal 1: Header Signal (50 pts)
+  const headerResult = detectHeaderSignal(jsonData);
+  log.headerSignal = headerResult;
+  totalScore += headerResult.points;
+  
+  if (headerResult.found && headerResult.channelCode) {
+    // Immediate classification as rate card
+    log.totalScore = totalScore;
+    log.verdict = 'rate';
+    log.reason = 'Channel code found in header (priority signal)';
+    return {
+      totalScore,
+      verdict: 'rate',
+      channelCode: headerResult.channelCode,
+      effectiveDate: headerResult.effectiveDate,
+      log
+    };
+  }
+  
+  // Signal 2: Column Mapping Signal (≤50 pts, base 30)
+  const columnResult = detectColumnSignal(jsonData);
+  log.columnSignal = columnResult;
+  totalScore += columnResult.points;
+  
+  // Signal 3: Weight-Range Signal (20 pts)
+  const weightResult = detectWeightSignal(jsonData);
+  log.weightSignal = weightResult;
+  totalScore += weightResult.points;
+  
+  // Decision logic
+  log.totalScore = totalScore;
+  
+  if (totalScore >= 60) {
+    log.verdict = 'rate';
+    log.reason = `Total score ${totalScore} ≥ 60 threshold`;
+    return { totalScore, verdict: 'rate', log };
+  } else if (columnResult.points >= 40 && weightResult.found) {
+    log.verdict = 'rate';
+    log.reason = 'Strong column mapping + weight range detected';
+    return { totalScore, verdict: 'rate', log };
+  } else {
+    log.verdict = 'uncertain';
+    log.reason = `Total score ${totalScore} < 60, requires manual annotation`;
+    return { totalScore, verdict: 'uncertain', log };
+  }
+};
 
-  // Scan top-left cells for channel code patterns (运输代码/渠道代码/Channel Code)
-  const codeRegexes = [
-    /运输代码[:：]\s*([A-Za-z0-9_-]+)/,
-    /渠道代码[:：]\s*([A-Za-z0-9_-]+)/,
-    /Channel\s*Code[:：]?\s*([A-Za-z0-9_-]+)/i,
-    /Channel\s*ID[:：]?\s*([A-Za-z0-9_-]+)/i,
-  ];
+// Header signal detector (50 pts)
+const detectHeaderSignal = (jsonData: any[][]): {
+  found: boolean;
+  channelCode?: string;
+  effectiveDate?: string;
+  points: number;
+} => {
+  const channelRegex = /运输代码[:：]\s*([A-Za-z0-9\-]+)/;
+  const dateRegex = /(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/;
+  
   const maxRows = Math.min(12, jsonData.length);
   for (let r = 0; r < maxRows; r++) {
-    const row = jsonData[r] as any[];
-    const maxCols = row ? Math.min(8, row.length) : 0;
+    const row = jsonData[r];
+    if (!row) continue;
+    const maxCols = Math.min(6, row.length);
     for (let c = 0; c < maxCols; c++) {
       const cell = row[c];
       if (typeof cell === 'string') {
-        for (const re of codeRegexes) {
-          const m = cell.match(re);
-          if (m && m[1]) {
-            return m[1].toUpperCase();
+        const normalized = normalizeText(cell);
+        const channelMatch = normalized.match(channelRegex);
+        if (channelMatch) {
+          const dateMatch = normalized.match(dateRegex);
+          return {
+            found: true,
+            channelCode: channelMatch[1].toUpperCase(),
+            effectiveDate: dateMatch ? dateMatch[1] : undefined,
+            points: 50
+          };
+        }
+      }
+    }
+  }
+  
+  return { found: false, points: 0 };
+};
+
+// Column mapping signal detector (≤50 pts, base 30)
+const detectColumnSignal = (jsonData: any[][]): {
+  matchedHeaders: string[];
+  points: number;
+} => {
+  const headerPatterns = [
+    { regex: /(国家\/地区|国家|目的地)/, name: '国家/地区' },
+    { regex: /(分区|区域|分区代码)/, name: '分区' },
+    { regex: /(参考时效|时效|派送时效)/, name: '时效' },
+    { regex: /(重量\(KG\)|重量区间|重量段|重量)/, name: '重量' },
+    { regex: /(进位制\(KG\)|进位制|计费进位)/, name: '进位制' },
+    { regex: /(最低计费重\(KG\)|最低计费重|最低计费重量)/, name: '最低计费重' },
+    { regex: /(运费\(RMB\/KG\)|运费\(元\/KG\)|价格|运费)/, name: '运费' },
+    { regex: /(挂号费\(RMB\/票\)|挂号费|处理费)/, name: '挂号费' }
+  ];
+  
+  const matchedHeaders: string[] = [];
+  const maxRows = Math.min(15, jsonData.length);
+  
+  for (let r = 0; r < maxRows; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === 'string') {
+        const normalized = normalizeText(cell);
+        for (const pattern of headerPatterns) {
+          if (pattern.regex.test(normalized) && !matchedHeaders.includes(pattern.name)) {
+            matchedHeaders.push(pattern.name);
           }
         }
       }
     }
   }
-
-  // Vendor hint fallback
-  if (/云途|YunExpress/i.test(sheetName)) {
-    return 'YE000';
+  
+  const hitCount = matchedHeaders.length;
+  let points = 0;
+  if (hitCount >= 3) {
+    points = 30 + Math.min(20, (hitCount - 3) * 5);
   }
+  
+  return { matchedHeaders, points };
+};
 
-  // Fallback random code
-  return `CH${Math.floor(Math.random() * 1000)}`;
+// Weight-range signal detector (20 pts)
+const detectWeightSignal = (jsonData: any[][]): {
+  found: boolean;
+  samples: string[];
+  points: number;
+} => {
+  const weightPatterns = [
+    /(?<l>\d+(?:\.\d+)?)\s*[<＜]\s*W\s*[<=≤]\s*(?<u>\d+(?:\.\d+)?)/i,
+    /^0\s*[<＜]\s*W\s*[<=≤]\s*(?<u>\d+(?:\.\d+)?)$/i,
+    /^(?<l>\d+(?:\.\d+)?)\s*[<＜]\s*W\s*[<=≤]\s*MAX$/i
+  ];
+  
+  const samples: string[] = [];
+  const maxRows = Math.min(100, jsonData.length);
+  
+  for (let r = 0; r < maxRows; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (typeof cell === 'string') {
+        const normalized = normalizeText(cell);
+        for (const pattern of weightPatterns) {
+          if (pattern.test(normalized)) {
+            if (samples.length < 3) {
+              samples.push(normalized);
+            }
+            return { found: true, samples, points: 20 };
+          }
+        }
+      }
+    }
+  }
+  
+  return { found: false, samples: [], points: 0 };
 };
 
 const simulateStructureValidation = (index: number): StructureChangeLevel => {
