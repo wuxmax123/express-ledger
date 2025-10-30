@@ -1,12 +1,20 @@
 import * as XLSX from 'xlsx';
 import { ParsedSheetData, StructureChangeLevel, DetectionVerdict, DetectionLog } from '@/types';
 
-// Text normalization
+// Text normalization - enhanced for full-width characters
 const normalizeText = (text: string): string => {
   return text
     .replace(/＜/g, '<')
     .replace(/≤/g, '<=')
     .replace(/：/g, ':')
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/【/g, '[')
+    .replace(/】/g, ']')
+    // Normalize full-width alphanumeric to half-width
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => {
+      return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+    })
     .replace(/\s+/g, ' ')
     .trim();
 };
@@ -31,8 +39,8 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
             const worksheet = workbook.Sheets[sheetName];
             let jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
             
-            // Forward-fill merged cells in first 3 rows
-            jsonData = forwardFillMergedCells(jsonData, 3);
+            // Forward-fill merged cells in first 5 rows (increased from 3)
+            jsonData = forwardFillMergedCells(jsonData, 5);
             
             // Check blacklist/whitelist
             if (SHEET_BLACKLIST.test(sheetName)) {
@@ -130,7 +138,7 @@ export const parseExcelFile = async (file: File, checkHistory: (channelCode: str
   });
 };
 
-// Forward-fill merged cells
+// Forward-fill merged cells - enhanced to handle more rows
 const forwardFillMergedCells = (jsonData: any[][], rows: number): any[][] => {
   const maxRows = Math.min(rows, jsonData.length);
   for (let r = 0; r < maxRows; r++) {
@@ -214,47 +222,132 @@ const runThreeSignalDetector = (sheetName: string, jsonData: any[][]): {
   return { totalScore: 0, verdict: 'skipped', log };
 };
 
-// Header signal detector (50 pts)
+// Header signal detector (50 pts) - Enhanced for merged cells and multi-line patterns
 const detectHeaderSignal = (jsonData: any[][]): {
   found: boolean;
   channelCode?: string;
   effectiveDate?: string;
   points: number;
 } => {
-  // Multiple regex patterns for channel/transport code
+  // Multiple regex patterns for channel/transport code - enhanced patterns
   const channelRegexes = [
-    /运输代码[:：]\s*([A-Za-z0-9\-]+)/,
-    /渠道代码[:：]\s*([A-Za-z0-9\-]+)/,
+    /运输代码[:：\s]*([A-Za-z0-9\-]+)/,
+    /渠道代码[:：\s]*([A-Za-z0-9\-]+)/,
     /Channel\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i,
-    /Transport\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i
+    /Transport\s*Code[:：]?\s*([A-Za-z0-9\-]+)/i,
+    // Pattern for merged cells where label and value might be split
+    /^(运输代码|渠道代码|Channel Code|Transport Code)[:：\s]*$/i
   ];
-  const dateRegex = /(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/;
+  const codeOnlyPattern = /^([A-Z]{2}[A-Z0-9]{2,})$/; // Match code-only cells like "YE123"
+  const dateRegex = /(\d{4}[-\/]\d{2}[-\/]\d{2}\s*\d{2}:\d{2})/;
   
-  const maxRows = Math.min(12, jsonData.length);
+  const maxRows = Math.min(15, jsonData.length);
+  
+  // First pass: look for complete patterns
   for (let r = 0; r < maxRows; r++) {
     const row = jsonData[r];
     if (!row) continue;
-    const maxCols = Math.min(8, row.length);
+    const maxCols = Math.min(10, row.length);
+    
     for (let c = 0; c < maxCols; c++) {
       const cell = row[c];
       if (typeof cell === 'string') {
         const normalized = normalizeText(cell);
         
         // Try all channel code patterns
-        for (const channelRegex of channelRegexes) {
+        for (const channelRegex of channelRegexes.slice(0, 4)) { // First 4 are complete patterns
           const channelMatch = normalized.match(channelRegex);
           if (channelMatch && channelMatch[1]) {
-            const dateMatch = normalized.match(dateRegex);
             const extractedCode = channelMatch[1].trim().toUpperCase();
             
-            // Ensure channel code is not empty
-            if (extractedCode.length > 0) {
+            // Ensure channel code is valid format (2+ letters + digits)
+            if (extractedCode.length >= 4 && /^[A-Z]{2}[A-Z0-9]+$/.test(extractedCode)) {
+              // Look for date in same cell or nearby cells
+              let effectiveDate: string | undefined;
+              const dateMatch = normalized.match(dateRegex);
+              if (dateMatch) {
+                effectiveDate = dateMatch[1].replace('/', '-');
+              } else {
+                // Check adjacent cells for date
+                for (let nc = Math.max(0, c - 2); nc < Math.min(maxCols, c + 3); nc++) {
+                  if (row[nc] && typeof row[nc] === 'string') {
+                    const dateM = normalizeText(row[nc]).match(dateRegex);
+                    if (dateM) {
+                      effectiveDate = dateM[1].replace('/', '-');
+                      break;
+                    }
+                  }
+                }
+              }
+              
               return {
                 found: true,
                 channelCode: extractedCode,
-                effectiveDate: dateMatch ? dateMatch[1] : undefined,
+                effectiveDate,
                 points: 50
               };
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Second pass: look for split patterns (label in one cell, code in next cell/row)
+  for (let r = 0; r < maxRows; r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    const maxCols = Math.min(10, row.length);
+    
+    for (let c = 0; c < maxCols; c++) {
+      const cell = row[c];
+      if (typeof cell === 'string') {
+        const normalized = normalizeText(cell);
+        
+        // Check if this cell contains label only (merged cell pattern)
+        if (channelRegexes[4].test(normalized)) {
+          // Look for code in adjacent cells (right, below, below-right)
+          const checkCells = [
+            { r, c: c + 1 },           // Right
+            { r, c: c + 2 },           // Two cells right
+            { r: r + 1, c },           // Below
+            { r: r + 1, c: c + 1 },    // Below-right
+            { r: r + 2, c }            // Two rows below
+          ];
+          
+          for (const pos of checkCells) {
+            if (pos.r < jsonData.length && jsonData[pos.r] && pos.c < jsonData[pos.r].length) {
+              const targetCell = jsonData[pos.r][pos.c];
+              if (typeof targetCell === 'string') {
+                const targetNorm = normalizeText(targetCell);
+                const codeMatch = targetNorm.match(codeOnlyPattern);
+                if (codeMatch && codeMatch[1]) {
+                  const extractedCode = codeMatch[1].toUpperCase();
+                  
+                  // Look for date nearby
+                  let effectiveDate: string | undefined;
+                  for (let nr = Math.max(0, r - 1); nr < Math.min(maxRows, r + 3); nr++) {
+                    if (!jsonData[nr]) continue;
+                    for (let nc = Math.max(0, c - 2); nc < Math.min(jsonData[nr].length, c + 5); nc++) {
+                      if (jsonData[nr][nc] && typeof jsonData[nr][nc] === 'string') {
+                        const dateM = normalizeText(jsonData[nr][nc]).match(dateRegex);
+                        if (dateM) {
+                          effectiveDate = dateM[1].replace('/', '-');
+                          break;
+                        }
+                      }
+                    }
+                    if (effectiveDate) break;
+                  }
+                  
+                  return {
+                    found: true,
+                    channelCode: extractedCode,
+                    effectiveDate,
+                    points: 50
+                  };
+                }
+              }
             }
           }
         }
