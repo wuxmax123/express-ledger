@@ -141,7 +141,7 @@ const resources = {
       'nav.history': '版本历史',
       'nav.browse': '价格浏览',
       'nav.compare': '价格对比',
-      'nav.vendors': '供应商',
+      'nav.vendors': '物流商',
       'nav.channels': '渠道',
       
       // Import Wizard
@@ -154,7 +154,7 @@ const resources = {
       'import.upload.title': '上传Excel文件',
       'import.upload.hint': '点击或拖拽文件到此区域上传',
       'import.upload.desc': '支持多工作表Excel文件 (.xlsx, .xls)',
-      'import.selectVendor': '选择供应商',
+      'import.selectVendor': '选择物流商',
       'import.parsing': '正在解析文件...',
       'import.preview.title': '工作表预览',
       'import.preview.rows': '行',
@@ -176,7 +176,7 @@ const resources = {
       // Diff Center
       'diff.title': '运价差异中心',
       'diff.filters': '筛选条件',
-      'diff.vendor': '供应商',
+      'diff.vendor': '物流商',
       'diff.channel': '渠道',
       'diff.dateRange': '日期范围',
       'diff.export': '导出',
