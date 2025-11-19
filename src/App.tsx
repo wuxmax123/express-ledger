@@ -13,6 +13,9 @@ import RateHistory from "./pages/RateHistory";
 import RateBrowse from "./pages/RateBrowse";
 import RateCompare from "./pages/RateCompare";
 import Vendors from "./pages/Vendors";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ApprovalCenter from "./pages/ApprovalCenter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +38,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
               <Route path="/" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/import" element={<Layout><RateImport /></Layout>} />
               <Route path="/rates/diff" element={<Layout><RateDiff /></Layout>} />
@@ -43,6 +48,7 @@ const App = () => (
               <Route path="/rates/browse" element={<Layout><RateBrowse /></Layout>} />
               <Route path="/rates/compare" element={<Layout><RateCompare /></Layout>} />
               <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
+              <Route path="/approval" element={<Layout><ApprovalCenter /></Layout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

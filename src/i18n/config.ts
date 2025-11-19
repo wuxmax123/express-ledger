@@ -12,6 +12,12 @@ const resources = {
       'nav.compare': 'Rate Compare',
       'nav.vendors': 'Vendors',
       'nav.channels': 'Channels',
+      'nav.approval': 'Approval Center',
+      
+      // Auth
+      'auth.login': 'Login',
+      'auth.logout': 'Logout',
+      'auth.signup': 'Sign Up',
       
       // Import Wizard
       'import.title': 'Rate Import Wizard',
@@ -143,6 +149,12 @@ const resources = {
       'nav.compare': '价格对比',
       'nav.vendors': '物流商',
       'nav.channels': '渠道',
+      'nav.approval': '审核中心',
+      
+      // Auth
+      'auth.login': '登录',
+      'auth.logout': '退出登录',
+      'auth.signup': '注册',
       
       // Import Wizard
       'import.title': '运价导入向导',
