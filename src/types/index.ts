@@ -2,6 +2,12 @@ export type StructureChangeLevel = 'NONE' | 'MINOR' | 'MAJOR';
 
 export type ImportStatus = 'PENDING' | 'VALIDATING' | 'NEED_CONFIRM' | 'READY' | 'FAILED' | 'SUCCESS';
 
+// Approval status type
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+// User role type
+export type UserRole = 'admin' | 'rate_supervisor' | 'user';
+
 export interface Vendor {
   id: number;
   name: string;
@@ -32,6 +38,10 @@ export interface VendorBatch {
   effectiveDate?: string;
   totalChannels: number;
   notes?: string;
+  approvalStatus: ApprovalStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface ChannelRateSheet {
@@ -43,6 +53,10 @@ export interface ChannelRateSheet {
   fileName: string;
   uploadedBy: string;
   status: 'active' | 'inactive';
+  approvalStatus: ApprovalStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt: string;
 }

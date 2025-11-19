@@ -1,6 +1,7 @@
-import { Layout as AntLayout, Menu, Button, Dropdown } from 'antd';
+import { Layout as AntLayout, Menu, Button, Dropdown, Avatar } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { 
   UploadOutlined, 
   DiffOutlined, 
@@ -8,7 +9,11 @@ import {
   ShopOutlined,
   GlobalOutlined,
   DatabaseOutlined,
-  SwapOutlined
+  SwapOutlined,
+  CheckCircleOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  LoginOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -22,6 +27,7 @@ export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, i18n } = useTranslation();
+  const { user, signOut } = useAuth();
 
   const menuItems: MenuProps['items'] = [
     {
@@ -59,6 +65,12 @@ export const Layout = ({ children }: LayoutProps) => {
       icon: <ShopOutlined />,
       label: t('nav.vendors'),
       onClick: () => navigate('/vendors')
+    },
+    {
+      key: '/approval',
+      icon: <CheckCircleOutlined />,
+      label: t('nav.approval'),
+      onClick: () => navigate('/approval')
     }
   ];
 
@@ -75,6 +87,22 @@ export const Layout = ({ children }: LayoutProps) => {
     }
   ];
 
+  const userMenuItems: MenuProps['items'] = user ? [
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: t('auth.logout'),
+      onClick: () => signOut().then(() => navigate('/login'))
+    }
+  ] : [
+    {
+      key: 'login',
+      icon: <LoginOutlined />,
+      label: t('auth.login'),
+      onClick: () => navigate('/login')
+    }
+  ];
+
   return (
     <AntLayout className="min-h-screen">
       <Header className="flex items-center justify-between px-6 bg-primary">
@@ -83,11 +111,18 @@ export const Layout = ({ children }: LayoutProps) => {
             Logistics Rate Management
           </div>
         </div>
-        <Dropdown menu={{ items: languageItems }} placement="bottomRight">
-          <Button type="text" icon={<GlobalOutlined />} className="text-white">
-            {i18n.language === 'zh' ? '中文' : 'English'}
-          </Button>
-        </Dropdown>
+        <div className="flex items-center gap-4">
+          <Dropdown menu={{ items: languageItems }} placement="bottomRight">
+            <Button type="text" icon={<GlobalOutlined />} className="text-white">
+              {i18n.language === 'zh' ? '中文' : 'English'}
+            </Button>
+          </Dropdown>
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+            <Button type="text" icon={<UserOutlined />} className="text-white">
+              {user ? user.email : t('auth.login')}
+            </Button>
+          </Dropdown>
+        </div>
       </Header>
       <AntLayout>
         <Sider width={220} className="bg-card">

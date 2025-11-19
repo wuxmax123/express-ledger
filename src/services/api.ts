@@ -195,7 +195,8 @@ export const api = {
         uploadedAt: '2025-10-20T10:30:00',
         effectiveDate: '2025-10-21',
         totalChannels: 22,
-        notes: '调整欧洲区价格，新增俄罗斯专线'
+        notes: '调整欧洲区价格，新增俄罗斯专线',
+        approvalStatus: 'approved'
       },
       {
         id: 2,
@@ -205,7 +206,8 @@ export const api = {
         uploadedAt: '2025-09-15T14:20:00',
         effectiveDate: '2025-09-16',
         totalChannels: 20,
-        notes: '新增美国专线，优化亚洲区时效'
+        notes: '新增美国专线，优化亚洲区时效',
+        approvalStatus: 'approved'
       },
       {
         id: 3,
@@ -215,6 +217,7 @@ export const api = {
         uploadedAt: '2025-08-01T09:00:00',
         effectiveDate: '2025-08-02',
         totalChannels: 18,
+        approvalStatus: 'pending'
       },
     ];
   },
@@ -232,6 +235,7 @@ export const api = {
         fileName: '云途报价20251020.xlsx',
         uploadedBy: 'admin',
         status: 'active',
+        approvalStatus: 'approved',
         createdAt: '2025-10-20T10:30:00',
         updatedAt: '2025-10-20T10:30:00'
       },
@@ -244,6 +248,7 @@ export const api = {
         fileName: '云途报价20251020.xlsx',
         uploadedBy: 'admin',
         status: 'active',
+        approvalStatus: 'approved',
         createdAt: '2025-10-20T10:30:00',
         updatedAt: '2025-10-20T10:30:00'
       },
@@ -264,6 +269,7 @@ export const api = {
         fileName: '云途报价20251020.xlsx',
         uploadedBy: 'admin',
         status: 'active',
+        approvalStatus: 'approved',
         createdAt: '2025-10-20T10:30:00',
         updatedAt: '2025-10-20T10:30:00'
       },
@@ -276,6 +282,7 @@ export const api = {
         fileName: '云途报价20250915.xlsx',
         uploadedBy: 'admin',
         status: 'inactive',
+        approvalStatus: 'approved',
         createdAt: '2025-09-15T14:20:00',
         updatedAt: '2025-09-15T14:20:00'
       },
@@ -288,6 +295,8 @@ export const api = {
         fileName: '云途报价20250801.xlsx',
         uploadedBy: 'system',
         status: 'inactive',
+        approvalStatus: 'rejected',
+        rejectionReason: '价格数据不完整',
         createdAt: '2025-08-01T09:00:00',
         updatedAt: '2025-08-01T09:00:00'
       },
