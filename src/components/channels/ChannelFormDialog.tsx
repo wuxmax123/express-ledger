@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -85,7 +86,11 @@ export function ChannelFormDialog({
       max_weight: channel?.max_weight || '',
       max_single_side: channel?.max_single_side || '',
       dimension_limit_notes: channel?.dimension_limit_notes || '',
-      // Conditional rules
+      // Weight ranges for multi-threshold rules
+      weight_ranges: channel?.conditional_rules?.ranges || [
+        { max_weight: 20, divisor: 6000 }
+      ],
+      // Legacy conditional rules (kept for backward compatibility)
       cond_weight_max: channel?.conditional_rules?.rules?.[0]?.condition?.weight_max || 2,
       cond_base_divisor: channel?.conditional_rules?.rules?.[0]?.condition?.base_divisor || 6000,
       cond_ratio_threshold: channel?.conditional_rules?.rules?.[0]?.condition?.volume_ratio_threshold || 2,
@@ -110,6 +115,9 @@ export function ChannelFormDialog({
         max_weight: channel.max_weight || '',
         max_single_side: channel.max_single_side || '',
         dimension_limit_notes: channel.dimension_limit_notes || '',
+        weight_ranges: channel.conditional_rules?.ranges || [
+          { max_weight: 20, divisor: 6000 }
+        ],
         cond_weight_max: channel.conditional_rules?.rules?.[0]?.condition?.weight_max || 2,
         cond_base_divisor: channel.conditional_rules?.rules?.[0]?.condition?.base_divisor || 6000,
         cond_ratio_threshold: channel.conditional_rules?.rules?.[0]?.condition?.volume_ratio_threshold || 2,
@@ -138,27 +146,41 @@ export function ChannelFormDialog({
 
     // Add conditional rules if enabled
     if (useConditionalRules) {
-      cleanedData.conditional_rules = {
-        type: 'conditional_divisor',
-        rules: [
-          {
-            condition: {
-              weight_max: Number(data.cond_weight_max),
-              base_divisor: Number(data.cond_base_divisor),
-              volume_ratio_threshold: Number(data.cond_ratio_threshold),
-            },
-            actions: {
-              if_exceeds: {
-                divisor: Number(data.cond_exceeds_divisor),
+      const weightRanges = data.weight_ranges || [];
+      
+      if (weightRanges.length > 0) {
+        // Use new multi-weight-threshold format
+        cleanedData.conditional_rules = {
+          type: 'weight_ranges',
+          ranges: weightRanges.map((range: any) => ({
+            max_weight: range.max_weight ? Number(range.max_weight) : null,
+            divisor: Number(range.divisor),
+          })),
+        };
+      } else {
+        // Fallback to legacy format for backward compatibility
+        cleanedData.conditional_rules = {
+          type: 'conditional_divisor',
+          rules: [
+            {
+              condition: {
+                weight_max: Number(data.cond_weight_max),
+                base_divisor: Number(data.cond_base_divisor),
+                volume_ratio_threshold: Number(data.cond_ratio_threshold),
               },
-              if_not_exceeds: {
-                use: 'actual_weight',
+              actions: {
+                if_exceeds: {
+                  divisor: Number(data.cond_exceeds_divisor),
+                },
+                if_not_exceeds: {
+                  use: 'actual_weight',
+                },
               },
             },
-          },
-        ],
-        default_behavior: 'compare_and_take_larger',
-      };
+          ],
+          default_behavior: 'compare_and_take_larger',
+        };
+      }
     } else {
       cleanedData.conditional_rules = null;
     }
@@ -485,79 +507,118 @@ export function ChannelFormDialog({
 
               {useConditionalRules && (
                 <>
-                  <div className="p-4 border rounded-lg bg-background space-y-4">
-                    <h4 className="font-medium">条件设置</h4>
-
-                    <div>
-                      <Label htmlFor="cond_weight_max">重量阈值 (kg)</Label>
-                      <Input
-                        id="cond_weight_max"
-                        type="number"
-                        step="0.1"
-                        {...register('cond_weight_max')}
-                        placeholder="2"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        当实重 ≤ 此值时应用条件规则
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base">重量分段规则</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const currentRanges = watch('weight_ranges') || [
+                            { max_weight: 20, divisor: 6000 }
+                          ];
+                          setValue('weight_ranges', [
+                            ...currentRanges,
+                            { max_weight: '', divisor: '' }
+                          ]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        添加重量段
+                      </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="cond_base_divisor">基准泡比</Label>
-                        <Input
-                          id="cond_base_divisor"
-                          type="number"
-                          step="1"
-                          {...register('cond_base_divisor')}
-                          placeholder="6000"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          用于计算体积比率
-                        </p>
-                      </div>
-                      <div>
-                        <Label htmlFor="cond_ratio_threshold">比率阈值</Label>
-                        <Input
-                          id="cond_ratio_threshold"
-                          type="number"
-                          step="0.1"
-                          {...register('cond_ratio_threshold')}
-                          placeholder="2"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          体积比率超过此值时切换泡比
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="cond_exceeds_divisor">超出阈值时使用的泡比</Label>
-                      <Input
-                        id="cond_exceeds_divisor"
-                        type="number"
-                        step="1"
-                        {...register('cond_exceeds_divisor')}
-                        placeholder="8000"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        当体积比率超过阈值时使用此泡比
-                      </p>
+                    <div className="space-y-3">
+                      {(watch('weight_ranges') || [{ max_weight: 20, divisor: 6000 }]).map((range: any, index: number) => (
+                        <div key={index} className="p-4 border rounded-lg bg-background">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 grid grid-cols-3 gap-3">
+                              <div>
+                                <Label className="text-sm">重量起点 (kg)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  value={index === 0 ? 0 : (watch('weight_ranges')?.[index - 1]?.max_weight || 0)}
+                                  disabled
+                                  className="bg-muted"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm">
+                                  重量终点 (kg) {index === (watch('weight_ranges')?.length || 1) - 1 && <span className="text-muted-foreground">(留空表示无上限)</span>}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  value={range.max_weight}
+                                  onChange={(e) => {
+                                    const ranges = [...(watch('weight_ranges') || [])];
+                                    ranges[index] = {
+                                      ...ranges[index],
+                                      max_weight: e.target.value ? Number(e.target.value) : ''
+                                    };
+                                    setValue('weight_ranges', ranges);
+                                  }}
+                                  placeholder="如: 20"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm">泡比</Label>
+                                <Input
+                                  type="number"
+                                  step="1"
+                                  value={range.divisor}
+                                  onChange={(e) => {
+                                    const ranges = [...(watch('weight_ranges') || [])];
+                                    ranges[index] = {
+                                      ...ranges[index],
+                                      divisor: e.target.value ? Number(e.target.value) : ''
+                                    };
+                                    setValue('weight_ranges', ranges);
+                                  }}
+                                  placeholder="如: 6000"
+                                />
+                              </div>
+                            </div>
+                            {(watch('weight_ranges')?.length || 1) > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="mt-6"
+                                onClick={() => {
+                                  const ranges = [...(watch('weight_ranges') || [])];
+                                  ranges.splice(index, 1);
+                                  setValue('weight_ranges', ranges);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {index === 0 ? '0' : (watch('weight_ranges')?.[index - 1]?.max_weight || 0)} - {range.max_weight || '∞'} kg: 使用泡比 /{range.divisor || '?'}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
                     <h4 className="font-medium text-sm mb-2">规则说明</h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      当实重 ≤ {watch('cond_weight_max') || 2}kg 时：
-                      <br />• 若 (长×宽×高) / {watch('cond_base_divisor') || 6000} / 实重 &gt;{' '}
-                      {watch('cond_ratio_threshold') || 2}
-                      <br />  则体积重 = (长×宽×高) / {watch('cond_exceeds_divisor') || 8000}
-                      <br />• 若 (长×宽×高) / {watch('cond_base_divisor') || 6000} / 实重 ≤{' '}
-                      {watch('cond_ratio_threshold') || 2}
-                      <br />  则按实重收费
-                      <br />• 最终计费重 = max(实重, 体积重)
-                    </p>
+                    <div className="text-xs text-muted-foreground leading-relaxed space-y-1">
+                      {(watch('weight_ranges') || [{ max_weight: 20, divisor: 6000 }]).map((range: any, index: number) => {
+                        const prevWeight = index === 0 ? 0 : (watch('weight_ranges')?.[index - 1]?.max_weight || 0);
+                        const currentWeight = range.max_weight || '以上';
+                        return (
+                          <p key={index}>
+                            • 实重 {prevWeight} - {currentWeight} kg: 体积重 = (长×宽×高) / {range.divisor || '?'}
+                          </p>
+                        );
+                      })}
+                      <p className="mt-2 pt-2 border-t">最终计费重 = max(实重, 体积重)</p>
+                    </div>
                   </div>
                 </>
               )}
