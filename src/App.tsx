@@ -13,6 +13,7 @@ import RateHistory from "./pages/RateHistory";
 import RateBrowse from "./pages/RateBrowse";
 import RateCompare from "./pages/RateCompare";
 import Vendors from "./pages/Vendors";
+import ChannelManagement from "./pages/ChannelManagement";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ApprovalCenter from "./pages/ApprovalCenter";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/rates/browse" element={<Layout><RateBrowse /></Layout>} />
               <Route path="/rates/compare" element={<Layout><RateCompare /></Layout>} />
               <Route path="/vendors" element={<Layout><Vendors /></Layout>} />
+              <Route path="/channels" element={<Layout><ChannelManagement /></Layout>} />
               <Route path="/approval" element={<Layout><ApprovalCenter /></Layout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
