@@ -457,6 +457,47 @@ export function ChannelFormDialog({
                 </div>
               </div>
 
+              {/* 周长和围长计算 */}
+              {(watch('max_length') || watch('max_width') || watch('max_height')) && (
+                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                  <h4 className="font-medium text-sm mb-3">自动计算</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground">周长 (长+宽)×2</Label>
+                      <div className="mt-1 text-lg font-mono">
+                        {(() => {
+                          const length = Number(watch('max_length')) || 0;
+                          const width = Number(watch('max_width')) || 0;
+                          if (length || width) {
+                            return ((length + width) * 2).toFixed(1) + ' cm';
+                          }
+                          return '-';
+                        })()}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground">围长 长+2×(宽+高)</Label>
+                      <div className="mt-1 text-lg font-mono">
+                        {(() => {
+                          const length = Number(watch('max_length')) || 0;
+                          const width = Number(watch('max_width')) || 0;
+                          const height = Number(watch('max_height')) || 0;
+                          if (length || width || height) {
+                            return (length + 2 * (width + height)).toFixed(1) + ' cm';
+                          }
+                          return '-';
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    根据输入的长、宽、高自动计算
+                  </p>
+                </div>
+              )}
+
+              <Separator />
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="max_weight">最大重量 (kg)</Label>
