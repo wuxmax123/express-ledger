@@ -1,1 +1,4 @@
 project_id = "yjpclxhczvtjfkjasywb"
+
+[functions.calculate-chargeable-weight]
+verify_jwt = false

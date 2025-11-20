@@ -12,9 +12,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Package } from 'lucide-react';
+import { Pencil, Package, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChannelLimitDialog } from '@/components/channels/ChannelLimitDialog';
+import { WeightCalculator } from '@/components/channels/WeightCalculator';
 
 interface ShippingChannel {
   id: number;
@@ -31,11 +32,13 @@ interface ShippingChannel {
   max_weight: number | null;
   max_single_side: number | null;
   dimension_limit_notes: string | null;
+  conditional_rules: any | null;
 }
 
 const ChannelManagement = () => {
   const [editingChannel, setEditingChannel] = useState<ShippingChannel | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [testingChannel, setTestingChannel] = useState<ShippingChannel | null>(null);
   const queryClient = useQueryClient();
 
   const { data: channels, isLoading } = useQuery({
@@ -99,7 +102,7 @@ const ChannelManagement = () => {
                 <TableHead>渠道代码</TableHead>
                 <TableHead>渠道名称</TableHead>
                 <TableHead>服务类型</TableHead>
-                <TableHead>泡比</TableHead>
+                <TableHead>泡比规则</TableHead>
                 <TableHead>尺寸限制（长×宽×高 cm）</TableHead>
                 <TableHead>最大重量</TableHead>
                 <TableHead className="text-right">操作</TableHead>
@@ -129,7 +132,16 @@ const ChannelManagement = () => {
                       <Badge variant="secondary">{channel.service_type || '-'}</Badge>
                     </TableCell>
                     <TableCell>
-                      {channel.volume_weight_divisor ? (
+                      {channel.conditional_rules ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="font-mono">条件规则</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            /{channel.conditional_rules.rules?.[0]?.condition?.base_divisor || 6000}
+                            {' → '}
+                            /{channel.conditional_rules.rules?.[0]?.actions?.if_exceeds?.divisor || 8000}
+                          </span>
+                        </div>
+                      ) : channel.volume_weight_divisor ? (
                         <span className="font-mono">/{channel.volume_weight_divisor}</span>
                       ) : (
                         <span className="text-muted-foreground">未设置</span>
@@ -152,14 +164,24 @@ const ChannelManagement = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(channel)}
-                      >
-                        <Pencil className="h-4 w-4 mr-1" />
-                        编辑
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTestingChannel(channel)}
+                        >
+                          <Calculator className="h-4 w-4 mr-1" />
+                          测试
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(channel)}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          编辑
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -176,6 +198,24 @@ const ChannelManagement = () => {
           channel={editingChannel}
           onSave={handleSave}
         />
+      )}
+
+      {testingChannel && (
+        <div className="mt-6">
+          <WeightCalculator
+            channelId={testingChannel.id}
+            channelCode={testingChannel.channel_code}
+            conditionalRules={testingChannel.conditional_rules}
+            volumeWeightDivisor={testingChannel.volume_weight_divisor}
+          />
+          <Button
+            variant="outline"
+            onClick={() => setTestingChannel(null)}
+            className="mt-4"
+          >
+            关闭测试
+          </Button>
+        </div>
       )}
     </div>
   );
