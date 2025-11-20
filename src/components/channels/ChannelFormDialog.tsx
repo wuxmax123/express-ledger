@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -70,7 +71,7 @@ export function ChannelFormDialog({
     },
   });
 
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, reset, control, formState: { errors } } = useForm({
     defaultValues: {
       channel_code: channel?.channel_code || '',
       name: channel?.name || '',
@@ -85,12 +86,26 @@ export function ChannelFormDialog({
       max_weight: channel?.max_weight || '',
       max_single_side: channel?.max_single_side || '',
       dimension_limit_notes: channel?.dimension_limit_notes || '',
-      // Conditional rules
-      cond_weight_max: channel?.conditional_rules?.rules?.[0]?.condition?.weight_max || 2,
-      cond_base_divisor: channel?.conditional_rules?.rules?.[0]?.condition?.base_divisor || 6000,
-      cond_ratio_threshold: channel?.conditional_rules?.rules?.[0]?.condition?.volume_ratio_threshold || 2,
-      cond_exceeds_divisor: channel?.conditional_rules?.rules?.[0]?.actions?.if_exceeds?.divisor || 8000,
+      // Conditional rules array
+      conditional_rules: channel?.conditional_rules?.rules?.map((rule: any) => ({
+        weight_max: rule.condition?.weight_max || 2,
+        base_divisor: rule.condition?.base_divisor || 6000,
+        ratio_threshold: rule.condition?.volume_ratio_threshold || 2,
+        exceeds_divisor: rule.actions?.if_exceeds?.divisor || 8000,
+      })) || [
+        {
+          weight_max: 2,
+          base_divisor: 6000,
+          ratio_threshold: 2,
+          exceeds_divisor: 8000,
+        }
+      ],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'conditional_rules',
   });
 
   // Reset form when channel changes
@@ -110,10 +125,19 @@ export function ChannelFormDialog({
         max_weight: channel.max_weight || '',
         max_single_side: channel.max_single_side || '',
         dimension_limit_notes: channel.dimension_limit_notes || '',
-        cond_weight_max: channel.conditional_rules?.rules?.[0]?.condition?.weight_max || 2,
-        cond_base_divisor: channel.conditional_rules?.rules?.[0]?.condition?.base_divisor || 6000,
-        cond_ratio_threshold: channel.conditional_rules?.rules?.[0]?.condition?.volume_ratio_threshold || 2,
-        cond_exceeds_divisor: channel.conditional_rules?.rules?.[0]?.actions?.if_exceeds?.divisor || 8000,
+        conditional_rules: channel.conditional_rules?.rules?.map((rule: any) => ({
+          weight_max: rule.condition?.weight_max || 2,
+          base_divisor: rule.condition?.base_divisor || 6000,
+          ratio_threshold: rule.condition?.volume_ratio_threshold || 2,
+          exceeds_divisor: rule.actions?.if_exceeds?.divisor || 8000,
+        })) || [
+          {
+            weight_max: 2,
+            base_divisor: 6000,
+            ratio_threshold: 2,
+            exceeds_divisor: 8000,
+          }
+        ],
       });
       setUseConditionalRules(!!channel.conditional_rules);
     }
@@ -140,23 +164,21 @@ export function ChannelFormDialog({
     if (useConditionalRules) {
       cleanedData.conditional_rules = {
         type: 'conditional_divisor',
-        rules: [
-          {
-            condition: {
-              weight_max: Number(data.cond_weight_max),
-              base_divisor: Number(data.cond_base_divisor),
-              volume_ratio_threshold: Number(data.cond_ratio_threshold),
+        rules: data.conditional_rules.map((rule: any) => ({
+          condition: {
+            weight_max: Number(rule.weight_max),
+            base_divisor: Number(rule.base_divisor),
+            volume_ratio_threshold: Number(rule.ratio_threshold),
+          },
+          actions: {
+            if_exceeds: {
+              divisor: Number(rule.exceeds_divisor),
             },
-            actions: {
-              if_exceeds: {
-                divisor: Number(data.cond_exceeds_divisor),
-              },
-              if_not_exceeds: {
-                use: 'actual_weight',
-              },
+            if_not_exceeds: {
+              use: 'actual_weight',
             },
           },
-        ],
+        })),
         default_behavior: 'compare_and_take_larger',
       };
     } else {
@@ -404,77 +426,117 @@ export function ChannelFormDialog({
 
               {useConditionalRules && (
                 <>
-                  <div className="p-4 border rounded-lg bg-background space-y-4">
-                    <h4 className="font-medium">条件设置</h4>
-
-                    <div>
-                      <Label htmlFor="cond_weight_max">重量阈值 (kg)</Label>
-                      <Input
-                        id="cond_weight_max"
-                        type="number"
-                        step="0.1"
-                        {...register('cond_weight_max')}
-                        placeholder="2"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        当实重 ≤ 此值时应用条件规则
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">条件规则列表</h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => append({
+                          weight_max: 2,
+                          base_divisor: 6000,
+                          ratio_threshold: 2,
+                          exceeds_divisor: 8000,
+                        })}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        添加规则
+                      </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="cond_base_divisor">基准泡比</Label>
-                        <Input
-                          id="cond_base_divisor"
-                          type="number"
-                          step="1"
-                          {...register('cond_base_divisor')}
-                          placeholder="6000"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          用于计算体积比率
-                        </p>
+                    {fields.map((field, index) => (
+                      <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-medium text-sm">规则 {index + 1}</h5>
+                          {fields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => remove(index)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`conditional_rules.${index}.weight_max`}>
+                            重量阈值 (kg)
+                          </Label>
+                          <Input
+                            id={`conditional_rules.${index}.weight_max`}
+                            type="number"
+                            step="0.1"
+                            {...register(`conditional_rules.${index}.weight_max` as const)}
+                            placeholder="2"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            当实重 ≤ 此值时应用此规则
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`conditional_rules.${index}.base_divisor`}>
+                              基准泡比
+                            </Label>
+                            <Input
+                              id={`conditional_rules.${index}.base_divisor`}
+                              type="number"
+                              step="1"
+                              {...register(`conditional_rules.${index}.base_divisor` as const)}
+                              placeholder="6000"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              用于计算体积比率
+                            </p>
+                          </div>
+                          <div>
+                            <Label htmlFor={`conditional_rules.${index}.ratio_threshold`}>
+                              比率阈值
+                            </Label>
+                            <Input
+                              id={`conditional_rules.${index}.ratio_threshold`}
+                              type="number"
+                              step="0.1"
+                              {...register(`conditional_rules.${index}.ratio_threshold` as const)}
+                              placeholder="2"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              体积比率超过此值时切换泡比
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`conditional_rules.${index}.exceeds_divisor`}>
+                            超出阈值时使用的泡比
+                          </Label>
+                          <Input
+                            id={`conditional_rules.${index}.exceeds_divisor`}
+                            type="number"
+                            step="1"
+                            {...register(`conditional_rules.${index}.exceeds_divisor` as const)}
+                            placeholder="8000"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            当体积比率超过阈值时使用此泡比
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="cond_ratio_threshold">比率阈值</Label>
-                        <Input
-                          id="cond_ratio_threshold"
-                          type="number"
-                          step="0.1"
-                          {...register('cond_ratio_threshold')}
-                          placeholder="2"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          体积比率超过此值时切换泡比
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="cond_exceeds_divisor">超出阈值时使用的泡比</Label>
-                      <Input
-                        id="cond_exceeds_divisor"
-                        type="number"
-                        step="1"
-                        {...register('cond_exceeds_divisor')}
-                        placeholder="8000"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        当体积比率超过阈值时使用此泡比
-                      </p>
-                    </div>
+                    ))}
                   </div>
 
                   <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
                     <h4 className="font-medium text-sm mb-2">规则说明</h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      当实重 ≤ {watch('cond_weight_max') || 2}kg 时：
-                      <br />• 若 (长×宽×高) / {watch('cond_base_divisor') || 6000} / 实重 &gt;{' '}
-                      {watch('cond_ratio_threshold') || 2}
-                      <br />  则体积重 = (长×宽×高) / {watch('cond_exceeds_divisor') || 8000}
-                      <br />• 若 (长×宽×高) / {watch('cond_base_divisor') || 6000} / 实重 ≤{' '}
-                      {watch('cond_ratio_threshold') || 2}
-                      <br />  则按实重收费
+                      系统将按重量阈值从小到大匹配规则：
+                      <br />• 若实重符合某规则的重量阈值
+                      <br />• 计算体积比率 = (长×宽×高) / 基准泡比 / 实重
+                      <br />• 若体积比率 &gt; 比率阈值：使用对应的超出泡比计算体积重
+                      <br />• 若体积比率 ≤ 比率阈值：按实重收费
                       <br />• 最终计费重 = max(实重, 体积重)
                     </p>
                   </div>
