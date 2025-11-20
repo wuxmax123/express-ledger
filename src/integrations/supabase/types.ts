@@ -134,6 +134,7 @@ export type Database = {
       shipping_channels: {
         Row: {
           channel_code: string
+          conditional_rules: Json | null
           created_at: string | null
           currency: string | null
           dimension_limit_notes: string | null
@@ -152,6 +153,7 @@ export type Database = {
         }
         Insert: {
           channel_code: string
+          conditional_rules?: Json | null
           created_at?: string | null
           currency?: string | null
           dimension_limit_notes?: string | null
@@ -170,6 +172,7 @@ export type Database = {
         }
         Update: {
           channel_code?: string
+          conditional_rules?: Json | null
           created_at?: string | null
           currency?: string | null
           dimension_limit_notes?: string | null
