@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Calculator, Package } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 
 interface WeightCalculatorProps {
   channelId: number;
@@ -115,65 +114,6 @@ export function WeightCalculator({
             />
           </div>
         </div>
-
-        {/* 周长和围长显示 */}
-        {(length || width || height) && (
-          <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/50">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">周长</p>
-              </div>
-              <p className="text-xl font-bold font-mono">
-                {(() => {
-                  const l = Number(length) || 0;
-                  const w = Number(width) || 0;
-                  if (l || w) {
-                    return ((l + w) * 2).toFixed(1) + ' cm';
-                  }
-                  return '-';
-                })()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">(长+宽)×2</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">围长</p>
-              </div>
-              <p className="text-xl font-bold font-mono">
-                {(() => {
-                  const l = Number(length) || 0;
-                  const w = Number(width) || 0;
-                  const h = Number(height) || 0;
-                  if (l || w || h) {
-                    return (l + 2 * (w + h)).toFixed(1) + ' cm';
-                  }
-                  return '-';
-                })()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">长+2×(宽+高)</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">体积</p>
-              </div>
-              <p className="text-xl font-bold font-mono">
-                {(() => {
-                  const l = Number(length) || 0;
-                  const w = Number(width) || 0;
-                  const h = Number(height) || 0;
-                  if (l && w && h) {
-                    return (l * w * h).toFixed(1) + ' cm³';
-                  }
-                  return '-';
-                })()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">长×宽×高</p>
-            </div>
-          </div>
-        )}
 
         <Button onClick={handleCalculate} disabled={calculating} className="w-full">
           <Calculator className="h-4 w-4 mr-2" />

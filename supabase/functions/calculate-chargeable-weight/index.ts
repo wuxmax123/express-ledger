@@ -16,14 +16,8 @@ interface CalculateWeightRequest {
 
 interface ConditionalRules {
   type: string;
-  rules?: ConditionalRule[];
-  ranges?: WeightRange[];
+  rules: ConditionalRule[];
   default_behavior?: string;
-}
-
-interface WeightRange {
-  max_weight: number | null;
-  divisor: number;
 }
 
 interface ConditionalRule {
@@ -116,48 +110,8 @@ function applyConditionalRules(
   let calculation = '';
   let ruleApplied = '';
 
-  // Check if using new weight_ranges format
-  if (conditionalRules.type === 'weight_ranges' && conditionalRules.ranges) {
-    // Find the applicable weight range
-    let applicableRange = null;
-    
-    for (const range of conditionalRules.ranges) {
-      if (range.max_weight === null || actualWeight <= range.max_weight) {
-        applicableRange = range;
-        break;
-      }
-    }
-
-    if (!applicableRange) {
-      // Use last range as fallback
-      applicableRange = conditionalRules.ranges[conditionalRules.ranges.length - 1];
-    }
-
-    const divisor = applicableRange.divisor;
-    const volumeWeight = volume / divisor;
-    const chargeableWeight = Math.max(actualWeight, volumeWeight);
-
-    const rangeDesc = applicableRange.max_weight 
-      ? `≤ ${applicableRange.max_weight}kg` 
-      : `> ${conditionalRules.ranges[conditionalRules.ranges.length - 2]?.max_weight || 0}kg`;
-
-    calculation = `匹配重量段: 实重 ${rangeDesc}\n`;
-    calculation += `体积重 = (${length} × ${width} × ${height}) / ${divisor} = ${volumeWeight.toFixed(3)}kg\n`;
-    calculation += `计费重 = max(实重 ${actualWeight}kg, 体积重 ${volumeWeight.toFixed(3)}kg) = ${chargeableWeight.toFixed(3)}kg`;
-
-    ruleApplied = `使用泡比 /${divisor} (重量段: ${rangeDesc})`;
-
-    return {
-      actualWeight,
-      volumeWeight: Math.round(volumeWeight * 1000) / 1000,
-      chargeableWeight: Math.round(chargeableWeight * 1000) / 1000,
-      calculation,
-      ruleApplied
-    };
-  }
-
-  // Legacy conditional_divisor format (original implementation)
-  for (const rule of conditionalRules.rules || []) {
+  // Find applicable rule
+  for (const rule of conditionalRules.rules) {
     const { condition, actions } = rule;
     
     // Check if actual weight is within the condition
