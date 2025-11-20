@@ -12,9 +12,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Package, Calculator, Upload } from 'lucide-react';
+import { Pencil, Package, Calculator, Upload, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { ChannelLimitDialog } from '@/components/channels/ChannelLimitDialog';
+import { ChannelFormDialog } from '@/components/channels/ChannelFormDialog';
 import { WeightCalculator } from '@/components/channels/WeightCalculator';
 import { ChannelBulkImportDialog } from '@/components/channels/ChannelBulkImportDialog';
 
@@ -38,7 +38,7 @@ interface ShippingChannel {
 
 const ChannelManagement = () => {
   const [editingChannel, setEditingChannel] = useState<ShippingChannel | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [testingChannel, setTestingChannel] = useState<ShippingChannel | null>(null);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -56,33 +56,61 @@ const ChannelManagement = () => {
     },
   });
 
-  const updateChannelMutation = useMutation({
-    mutationFn: async (channel: Partial<ShippingChannel> & { id: number }) => {
+  const createChannelMutation = useMutation({
+    mutationFn: async (channel: Omit<ShippingChannel, 'id'>) => {
       const { error } = await supabase
         .from('shipping_channels')
-        .update(channel)
-        .eq('id', channel.id);
+        .insert(channel);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shipping-channels'] });
-      toast.success('渠道限制已更新');
-      setIsDialogOpen(false);
+      toast.success('渠道已创建');
+      setIsFormDialogOpen(false);
+      setEditingChannel(null);
+    },
+    onError: (error) => {
+      toast.error('创建失败: ' + error.message);
+    },
+  });
+
+  const updateChannelMutation = useMutation({
+    mutationFn: async (channel: Partial<ShippingChannel> & { id: number }) => {
+      const { id, ...updateData } = channel;
+      const { error } = await supabase
+        .from('shipping_channels')
+        .update(updateData)
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipping-channels'] });
+      toast.success('渠道已更新');
+      setIsFormDialogOpen(false);
+      setEditingChannel(null);
     },
     onError: (error) => {
       toast.error('更新失败: ' + error.message);
     },
   });
 
-  const handleEdit = (channel: ShippingChannel) => {
-    setEditingChannel(channel);
-    setIsDialogOpen(true);
+  const handleAdd = () => {
+    setEditingChannel(null);
+    setIsFormDialogOpen(true);
   };
 
-  const handleSave = (data: Partial<ShippingChannel>) => {
+  const handleEdit = (channel: ShippingChannel) => {
+    setEditingChannel(channel);
+    setIsFormDialogOpen(true);
+  };
+
+  const handleSave = (data: any) => {
     if (editingChannel) {
       updateChannelMutation.mutate({ ...data, id: editingChannel.id });
+    } else {
+      createChannelMutation.mutate(data);
     }
   };
 
@@ -93,10 +121,16 @@ const ChannelManagement = () => {
           <Package className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold text-foreground">渠道管理</h1>
         </div>
-        <Button onClick={() => setIsBulkImportOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" />
-          批量导入
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            批量导入
+          </Button>
+          <Button onClick={handleAdd}>
+            <Plus className="h-4 w-4 mr-2" />
+            添加渠道
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -199,14 +233,12 @@ const ChannelManagement = () => {
         </CardContent>
       </Card>
 
-      {editingChannel && (
-        <ChannelLimitDialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-          channel={editingChannel}
-          onSave={handleSave}
-        />
-      )}
+      <ChannelFormDialog
+        open={isFormDialogOpen}
+        onOpenChange={setIsFormDialogOpen}
+        channel={editingChannel || undefined}
+        onSave={handleSave}
+      />
 
       <ChannelBulkImportDialog
         open={isBulkImportOpen}
