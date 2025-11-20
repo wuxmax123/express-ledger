@@ -12,10 +12,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Package, Calculator } from 'lucide-react';
+import { Pencil, Package, Calculator, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChannelLimitDialog } from '@/components/channels/ChannelLimitDialog';
 import { WeightCalculator } from '@/components/channels/WeightCalculator';
+import { ChannelBulkImportDialog } from '@/components/channels/ChannelBulkImportDialog';
 
 interface ShippingChannel {
   id: number;
@@ -39,6 +40,7 @@ const ChannelManagement = () => {
   const [editingChannel, setEditingChannel] = useState<ShippingChannel | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [testingChannel, setTestingChannel] = useState<ShippingChannel | null>(null);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: channels, isLoading } = useQuery({
@@ -86,9 +88,15 @@ const ChannelManagement = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Package className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold text-foreground">渠道管理</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Package className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl font-bold text-foreground">渠道管理</h1>
+        </div>
+        <Button onClick={() => setIsBulkImportOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          批量导入
+        </Button>
       </div>
 
       <Card>
@@ -199,6 +207,11 @@ const ChannelManagement = () => {
           onSave={handleSave}
         />
       )}
+
+      <ChannelBulkImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+      />
 
       {testingChannel && (
         <div className="mt-6">
