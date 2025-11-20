@@ -136,34 +136,55 @@ export type Database = {
           channel_code: string
           created_at: string | null
           currency: string | null
+          dimension_limit_notes: string | null
           id: number
+          max_height: number | null
+          max_length: number | null
+          max_single_side: number | null
+          max_weight: number | null
+          max_width: number | null
           name: string
           region: string | null
           service_type: string | null
           updated_at: string | null
           vendor_id: number | null
+          volume_weight_divisor: number | null
         }
         Insert: {
           channel_code: string
           created_at?: string | null
           currency?: string | null
+          dimension_limit_notes?: string | null
           id?: number
+          max_height?: number | null
+          max_length?: number | null
+          max_single_side?: number | null
+          max_weight?: number | null
+          max_width?: number | null
           name: string
           region?: string | null
           service_type?: string | null
           updated_at?: string | null
           vendor_id?: number | null
+          volume_weight_divisor?: number | null
         }
         Update: {
           channel_code?: string
           created_at?: string | null
           currency?: string | null
+          dimension_limit_notes?: string | null
           id?: number
+          max_height?: number | null
+          max_length?: number | null
+          max_single_side?: number | null
+          max_weight?: number | null
+          max_width?: number | null
           name?: string
           region?: string | null
           service_type?: string | null
           updated_at?: string | null
           vendor_id?: number | null
+          volume_weight_divisor?: number | null
         }
         Relationships: [
           {

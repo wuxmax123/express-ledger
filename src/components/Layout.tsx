@@ -13,7 +13,8 @@ import {
   CheckCircleOutlined,
   UserOutlined,
   LogoutOutlined,
-  LoginOutlined
+  LoginOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -65,6 +66,12 @@ export const Layout = ({ children }: LayoutProps) => {
       icon: <ShopOutlined />,
       label: t('nav.vendors'),
       onClick: () => navigate('/vendors')
+    },
+    {
+      key: '/channels',
+      icon: <SettingOutlined />,
+      label: t('nav.channels'),
+      onClick: () => navigate('/channels')
     },
     {
       key: '/approval',
