@@ -318,6 +318,87 @@ export function ChannelFormDialog({
                   </p>
                 )}
               </div>
+
+              <Separator className="my-4" />
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-base">条件性泡比规则（快速设置）</Label>
+                  <Switch
+                    checked={useConditionalRules}
+                    onCheckedChange={setUseConditionalRules}
+                  />
+                </div>
+                
+                {useConditionalRules && (
+                  <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="cond_weight_max" className="text-sm">
+                          重量阈值 (kg)
+                        </Label>
+                        <Input
+                          id="cond_weight_max"
+                          type="number"
+                          step="0.1"
+                          {...register('cond_weight_max')}
+                          placeholder="2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cond_base_divisor" className="text-sm">
+                          基准泡比
+                        </Label>
+                        <Input
+                          id="cond_base_divisor"
+                          type="number"
+                          step="1"
+                          {...register('cond_base_divisor')}
+                          placeholder="6000"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="cond_ratio_threshold" className="text-sm">
+                          比率阈值
+                        </Label>
+                        <Input
+                          id="cond_ratio_threshold"
+                          type="number"
+                          step="0.1"
+                          {...register('cond_ratio_threshold')}
+                          placeholder="2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cond_exceeds_divisor" className="text-sm">
+                          超出时泡比
+                        </Label>
+                        <Input
+                          id="cond_exceeds_divisor"
+                          type="number"
+                          step="1"
+                          {...register('cond_exceeds_divisor')}
+                          placeholder="8000"
+                        />
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      实重 ≤ {watch('cond_weight_max') || 2}kg 时，若体积比率 &gt; {watch('cond_ratio_threshold') || 2}，
+                      则使用泡比 /{watch('cond_exceeds_divisor') || 8000}；否则按实重计费
+                    </p>
+                  </div>
+                )}
+                
+                {!useConditionalRules && (
+                  <p className="text-sm text-muted-foreground">
+                    启用后可根据包裹重量和体积比率动态选择泡比。需要高级设置请切换到"条件规则"标签页
+                  </p>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-4 mt-4">
