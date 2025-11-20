@@ -236,14 +236,14 @@ export function ChannelFormDialog({
                 <div>
                   <Label htmlFor="vendor_id">供应商</Label>
                   <Select
-                    value={watch('vendor_id')}
-                    onValueChange={(value) => setValue('vendor_id', value)}
+                    value={watch('vendor_id') || 'none'}
+                    onValueChange={(value) => setValue('vendor_id', value === 'none' ? '' : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="选择供应商（可选）" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">无</SelectItem>
+                      <SelectItem value="none">无</SelectItem>
                       {vendors?.map((vendor) => (
                         <SelectItem key={vendor.id} value={vendor.id.toString()}>
                           {vendor.name} ({vendor.code})
