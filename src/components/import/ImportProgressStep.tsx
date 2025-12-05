@@ -162,11 +162,6 @@ export const ImportProgressStep = () => {
     doImport();
   }, []);
 
-  const handleViewApproval = () => {
-    reset();
-    navigate('/rates/approval');
-  };
-
   const handleViewDiff = () => {
     reset();
     navigate('/rates/diff');
@@ -200,15 +195,15 @@ export const ImportProgressStep = () => {
         subTitle={
           <div className="space-y-2">
             <p>批次号: <span className="font-mono font-bold">{batchCode}</span></p>
-            <p>已提交审核，请到审核中心进行审批</p>
+            <p>已提交审核，等待审核人员处理</p>
           </div>
         }
         extra={[
-          <Button type="primary" key="approval" onClick={handleViewApproval}>
-            前往审核中心
-          </Button>,
-          <Button key="diff" onClick={handleViewDiff}>
+          <Button type="primary" key="diff" onClick={handleViewDiff}>
             查看差异
+          </Button>,
+          <Button key="history" onClick={() => { reset(); navigate('/rates/history'); }}>
+            查看历史
           </Button>,
           <Button key="new" onClick={handleNewImport}>
             新建导入
