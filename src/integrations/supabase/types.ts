@@ -131,6 +131,57 @@ export type Database = {
           },
         ]
       }
+      effective_versions: {
+        Row: {
+          batch_id: number | null
+          channel_id: number | null
+          created_at: string | null
+          effective_date: string
+          id: number
+          is_active: boolean | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          version_code: string
+        }
+        Insert: {
+          batch_id?: number | null
+          channel_id?: number | null
+          created_at?: string | null
+          effective_date: string
+          id?: number
+          is_active?: boolean | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          version_code: string
+        }
+        Update: {
+          batch_id?: number | null
+          channel_id?: number | null
+          created_at?: string | null
+          effective_date?: string
+          id?: number
+          is_active?: boolean | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          version_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "effective_versions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "effective_versions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipping_channels: {
         Row: {
           channel_code: string
@@ -225,6 +276,7 @@ export type Database = {
           approval_status: Database["public"]["Enums"]["approval_status"] | null
           approved_at: string | null
           approved_by: string | null
+          batch_code: string | null
           effective_date: string | null
           file_name: string
           id: number
@@ -241,6 +293,7 @@ export type Database = {
             | null
           approved_at?: string | null
           approved_by?: string | null
+          batch_code?: string | null
           effective_date?: string | null
           file_name: string
           id?: number
@@ -257,6 +310,7 @@ export type Database = {
             | null
           approved_at?: string | null
           approved_by?: string | null
+          batch_code?: string | null
           effective_date?: string | null
           file_name?: string
           id?: number
@@ -309,6 +363,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_version_code: { Args: { p_channel_id: number }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

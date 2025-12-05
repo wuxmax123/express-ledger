@@ -10,6 +10,7 @@ interface ApprovalRequest {
   batchId: number;
   action: 'approve' | 'reject';
   rejectionReason?: string;
+  effectiveDate?: string; // Optional effective date for the version
 }
 
 serve(async (req) => {
@@ -52,11 +53,11 @@ serve(async (req) => {
       });
     }
 
-    const { batchId, action, rejectionReason }: ApprovalRequest = await req.json();
+    const { batchId, action, rejectionReason, effectiveDate }: ApprovalRequest = await req.json();
     console.log(`Processing ${action} for batch ${batchId} by user ${user.id}`);
 
     // Update vendor_batch approval status
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       approval_status: action === 'approve' ? 'approved' : 'rejected',
       approved_by: user.id,
       approved_at: new Date().toISOString(),
@@ -76,6 +77,17 @@ serve(async (req) => {
       throw batchUpdateError;
     }
 
+    // Get batch info including effective_date
+    const { data: batchInfo, error: batchInfoError } = await supabase
+      .from('vendor_batches')
+      .select('effective_date')
+      .eq('id', batchId)
+      .single();
+
+    if (batchInfoError) {
+      console.error('Batch info error:', batchInfoError);
+    }
+
     // Update all related channel_rate_sheets
     const { error: sheetsUpdateError } = await supabase
       .from('channel_rate_sheets')
@@ -93,12 +105,72 @@ serve(async (req) => {
       throw sheetsUpdateError;
     }
 
+    // If approved, create effective versions for each channel
+    const createdVersions: Array<{ channelId: number; versionCode: string }> = [];
+    
+    if (action === 'approve') {
+      // Get all sheets in this batch to create effective versions
+      const { data: sheets, error: sheetsError } = await supabase
+        .from('channel_rate_sheets')
+        .select('channel_id')
+        .eq('batch_id', batchId);
+
+      if (sheetsError) {
+        console.error('Error fetching sheets:', sheetsError);
+      } else if (sheets && sheets.length > 0) {
+        // Get unique channel IDs
+        const uniqueChannelIds = [...new Set(sheets.map(s => s.channel_id).filter(Boolean))];
+        
+        for (const channelId of uniqueChannelIds) {
+          // Generate version code using database function
+          const { data: versionCodeData, error: versionCodeError } = await supabase
+            .rpc('generate_version_code', { p_channel_id: channelId });
+
+          if (versionCodeError) {
+            console.error(`Error generating version code for channel ${channelId}:`, versionCodeError);
+            continue;
+          }
+
+          const versionCode = versionCodeData as string;
+          const versionEffectiveDate = effectiveDate || batchInfo?.effective_date || new Date().toISOString().split('T')[0];
+
+          // Deactivate previous active versions for this channel
+          await supabase
+            .from('effective_versions')
+            .update({ is_active: false })
+            .eq('channel_id', channelId)
+            .eq('is_active', true);
+
+          // Create new effective version
+          const { error: versionError } = await supabase
+            .from('effective_versions')
+            .insert({
+              version_code: versionCode,
+              batch_id: batchId,
+              channel_id: channelId,
+              effective_date: versionEffectiveDate,
+              reviewed_by: user.id,
+              reviewed_at: new Date().toISOString(),
+              is_active: true
+            });
+
+          if (versionError) {
+            console.error(`Error creating effective version for channel ${channelId}:`, versionError);
+          } else {
+            createdVersions.push({ channelId, versionCode });
+            console.log(`Created effective version ${versionCode} for channel ${channelId}`);
+          }
+        }
+      }
+    }
+
     console.log(`Successfully ${action}ed batch ${batchId}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Batch ${action}ed successfully` 
+        message: `Batch ${action}ed successfully`,
+        createdVersions: action === 'approve' ? createdVersions : undefined
       }),
       {
         status: 200,
