@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 interface VendorBatch {
   id: number;
   vendor_id: number;
+  batch_code: string;
   file_name: string;
   uploaded_at: string;
   effective_date: string;
@@ -94,6 +95,14 @@ const ApprovalCenter = () => {
   };
 
   const columns = [
+    {
+      title: '批次号',
+      dataIndex: 'batch_code',
+      key: 'batch_code',
+      render: (code: string) => (
+        <span className="font-mono text-sm">{code || '-'}</span>
+      ),
+    },
     {
       title: '物流商',
       dataIndex: ['vendors', 'name'],
