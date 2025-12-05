@@ -38,10 +38,24 @@ export interface VendorBatch {
   effectiveDate?: string;
   totalChannels: number;
   notes?: string;
+  batchCode?: string; // Import batch code (e.g., B20231201-001)
   approvalStatus: ApprovalStatus;
   approvedBy?: string;
   approvedAt?: string;
   rejectionReason?: string;
+}
+
+// Effective Version - created after approval (Official Version)
+export interface EffectiveVersion {
+  id: number;
+  versionCode: string; // V1, V2, V3 or YYYYMMDD-01 format
+  batchId: number; // Linked to the import batch
+  channelId: number;
+  effectiveDate: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface ChannelRateSheet {
