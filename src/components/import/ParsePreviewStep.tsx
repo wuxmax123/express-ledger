@@ -184,14 +184,6 @@ export const ParsePreviewStep = () => {
       render: (name: string) => name
     },
     {
-      title: 'Type',
-      dataIndex: 'sheetType',
-      key: 'sheetType',
-      render: (type: string) => (
-        <Tag color={type === 'RATE_CARD' ? 'blue' : type === 'UNCERTAIN' ? 'orange' : 'default'}>{type}</Tag>
-      )
-    },
-    {
       title: 'Channel Code',
       dataIndex: 'channelCode',
       key: 'channelCode',

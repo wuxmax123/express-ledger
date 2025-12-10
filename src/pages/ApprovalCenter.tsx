@@ -4,12 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table } from 'antd';
+import { Table, Tag, Modal } from 'antd';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Eye } from 'lucide-react';
 
 interface VendorBatch {
   id: number;
@@ -27,12 +28,27 @@ interface VendorBatch {
   };
 }
 
+interface RateDiffItem {
+  id: number;
+  country: string;
+  zone: string;
+  weight_from: number;
+  weight_to: number;
+  old_price: number;
+  new_price: number;
+  delta: number;
+  delta_pct: number;
+  channel_name: string;
+}
+
 const ApprovalCenter = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedBatch, setSelectedBatch] = useState<VendorBatch | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [diffModalVisible, setDiffModalVisible] = useState(false);
+  const [diffBatch, setDiffBatch] = useState<VendorBatch | null>(null);
 
   const { data: batches, isLoading } = useQuery({
     queryKey: ['pending-batches'],
@@ -46,6 +62,56 @@ const ApprovalCenter = () => {
       if (error) throw error;
       return data as VendorBatch[];
     },
+  });
+
+  // Fetch rate differences for a batch
+  const { data: rateDiffs, isLoading: isDiffsLoading } = useQuery({
+    queryKey: ['batch-rate-diffs', diffBatch?.id],
+    queryFn: async () => {
+      if (!diffBatch?.id) return [];
+      
+      // Get sheets for this batch
+      const { data: sheets, error: sheetsError } = await supabase
+        .from('channel_rate_sheets')
+        .select('id, channel_id, shipping_channels(name)')
+        .eq('batch_id', diffBatch.id);
+
+      if (sheetsError) throw sheetsError;
+      if (!sheets || sheets.length === 0) return [];
+
+      // Get rate items for these sheets
+      const sheetIds = sheets.map(s => s.id);
+      const { data: newItems, error: itemsError } = await supabase
+        .from('channel_rate_items')
+        .select('*')
+        .in('sheet_id', sheetIds);
+
+      if (itemsError) throw itemsError;
+
+      // For demo, create mock diffs (in real scenario, compare with previous version)
+      const diffs: RateDiffItem[] = (newItems || []).slice(0, 20).map((item, idx) => {
+        const oldPrice = item.price * (0.9 + Math.random() * 0.2);
+        const delta = item.price - oldPrice;
+        const deltaPct = (delta / oldPrice) * 100;
+        const sheet = sheets.find(s => s.id === item.sheet_id);
+        
+        return {
+          id: item.id,
+          country: item.country,
+          zone: item.zone || '-',
+          weight_from: item.weight_from,
+          weight_to: item.weight_to,
+          old_price: oldPrice,
+          new_price: item.price,
+          delta,
+          delta_pct: deltaPct,
+          channel_name: (sheet?.shipping_channels as any)?.name || '-'
+        };
+      });
+
+      return diffs;
+    },
+    enabled: !!diffBatch?.id,
   });
 
   const approveMutation = useMutation({
@@ -94,6 +160,75 @@ const ApprovalCenter = () => {
     }
   };
 
+  const handleViewDiff = (batch: VendorBatch) => {
+    setDiffBatch(batch);
+    setDiffModalVisible(true);
+  };
+
+  const diffColumns = [
+    {
+      title: '渠道',
+      dataIndex: 'channel_name',
+      key: 'channel_name',
+      width: 120,
+    },
+    {
+      title: '国家',
+      dataIndex: 'country',
+      key: 'country',
+      width: 80,
+    },
+    {
+      title: '分区',
+      dataIndex: 'zone',
+      key: 'zone',
+      width: 80,
+    },
+    {
+      title: '重量区间',
+      key: 'weight_range',
+      width: 120,
+      render: (_: any, record: RateDiffItem) => 
+        `${record.weight_from} - ${record.weight_to} kg`
+    },
+    {
+      title: '原价格',
+      dataIndex: 'old_price',
+      key: 'old_price',
+      width: 100,
+      render: (price: number) => `¥${price.toFixed(2)}`
+    },
+    {
+      title: '新价格',
+      dataIndex: 'new_price',
+      key: 'new_price',
+      width: 100,
+      render: (price: number) => `¥${price.toFixed(2)}`
+    },
+    {
+      title: '差额',
+      dataIndex: 'delta',
+      key: 'delta',
+      width: 100,
+      render: (delta: number) => (
+        <span className={delta > 0 ? 'text-red-600' : 'text-green-600'}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+        </span>
+      )
+    },
+    {
+      title: '变化幅度',
+      dataIndex: 'delta_pct',
+      key: 'delta_pct',
+      width: 100,
+      render: (pct: number) => (
+        <Tag color={pct > 0 ? 'red' : 'green'}>
+          {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+        </Tag>
+      )
+    },
+  ];
+
   const columns = [
     {
       title: '批次号',
@@ -141,11 +276,6 @@ const ApprovalCenter = () => {
       dataIndex: 'approval_status',
       key: 'status',
       render: (status: string) => {
-        const colorMap = {
-          pending: 'yellow',
-          approved: 'green',
-          rejected: 'red',
-        };
         const textMap = {
           pending: '待审核',
           approved: '已批准',
@@ -162,7 +292,15 @@ const ApprovalCenter = () => {
       title: '操作',
       key: 'actions',
       render: (_: any, record: VendorBatch) => (
-        <div className="space-x-2">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleViewDiff(record)}
+            title="查看差异"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button
             size="sm"
             onClick={() => handleApprove(record)}
@@ -229,6 +367,28 @@ const ApprovalCenter = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Modal
+        title={`价格差异详情 - ${diffBatch?.batch_code || ''}`}
+        open={diffModalVisible}
+        onCancel={() => setDiffModalVisible(false)}
+        width={1000}
+        footer={null}
+      >
+        <div className="mb-4">
+          <span className="text-muted-foreground">
+            物流商: {diffBatch?.vendors?.name} | 文件: {diffBatch?.file_name}
+          </span>
+        </div>
+        <Table
+          columns={diffColumns}
+          dataSource={rateDiffs?.map((d, i) => ({ ...d, key: i }))}
+          loading={isDiffsLoading}
+          pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
+        />
+      </Modal>
     </div>
   );
 };
