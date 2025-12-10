@@ -1,12 +1,9 @@
-import { useState } from 'react';
 import { Steps, Card, Button, Popconfirm } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { UploadStep } from '@/components/import/UploadStep';
 import { ParsePreviewStep } from '@/components/import/ParsePreviewStep';
-import { StructureValidationStep } from '@/components/import/StructureValidationStep';
-import { ConfirmActionsStep } from '@/components/import/ConfirmActionsStep';
 import { ImportProgressStep } from '@/components/import/ImportProgressStep';
 import { useImportStore } from '@/store/useImportStore';
 
@@ -30,9 +27,7 @@ const RateImport = () => {
   const steps = [
     { title: t('import.step1'), content: <UploadStep /> },
     { title: t('import.step2'), content: <ParsePreviewStep /> },
-    { title: t('import.step3'), content: <StructureValidationStep /> },
-    { title: t('import.step4'), content: <ConfirmActionsStep /> },
-    { title: t('import.step5'), content: <ImportProgressStep /> },
+    { title: t('import.step3'), content: <ImportProgressStep /> },
   ];
 
   return (
