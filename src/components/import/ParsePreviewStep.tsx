@@ -232,27 +232,6 @@ export const ParsePreviewStep = () => {
           </Popover>
         );
       }
-    },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_: any, record: ParsedSheetData) => {
-        if (record.needsMapping && editingSheet !== record.sheetName) {
-          return (
-            <Button size="small" type="link" onClick={() => setMappingSheet(record)}>
-              Map Columns
-            </Button>
-          );
-        }
-        if (record.detectionVerdict === 'uncertain' && !record.needsMapping && editingSheet !== record.sheetName) {
-          return (
-            <Button size="small" type="link" onClick={() => setEditingSheet(record.sheetName)}>
-              Annotate
-            </Button>
-          );
-        }
-        return '-';
-      }
     }
   ];
 
