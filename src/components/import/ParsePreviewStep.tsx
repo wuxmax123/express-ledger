@@ -198,16 +198,6 @@ export const ParsePreviewStep = () => {
       render: (code: string) => code || '-'
     },
     {
-      title: 'Version',
-      dataIndex: 'isFirstVersion',
-      key: 'isFirstVersion',
-      render: (isFirstVersion: boolean) => (
-        <Tag color={isFirstVersion ? 'green' : 'blue'}>
-          {isFirstVersion ? '初版' : '更新'}
-        </Tag>
-      )
-    },
-    {
       title: 'Details',
       key: 'details',
       render: (_: any, record: ParsedSheetData) => {
