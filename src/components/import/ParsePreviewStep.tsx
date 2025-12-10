@@ -1,5 +1,4 @@
 import { Button, Table, Tag, Alert, Popover, Form, Input, DatePicker, Checkbox, Space } from 'antd';
-import { InfoCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useImportStore } from '@/store/useImportStore';
 import { ParsedSheetData } from '@/types';
@@ -51,52 +50,6 @@ export const ParsePreviewStep = () => {
     setMappingSheet(null);
   };
   
-  const renderDetectionDetails = (record: ParsedSheetData) => {
-    const log = record.detectionLog;
-    if (!log) return null;
-    
-    return (
-      <div className="space-y-2 text-sm">
-        <div className="font-semibold">Detection Score: {log.totalScore}</div>
-        <div>Verdict: <Tag color={log.verdict === 'rate' ? 'green' : log.verdict === 'uncertain' ? 'orange' : 'default'}>{log.verdict}</Tag></div>
-        <div className="text-muted-foreground">{log.reason}</div>
-        
-        {log.headerSignal && (
-          <div className="border-t pt-2 mt-2">
-            <div className="font-medium">Header Signal: {log.headerSignal.points} pts</div>
-            {log.headerSignal.found && (
-              <div className="text-xs space-y-1 mt-1">
-                <div>✓ Channel Code: {log.headerSignal.channelCode}</div>
-                {log.headerSignal.effectiveDate && <div>✓ Effective Date: {log.headerSignal.effectiveDate}</div>}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {log.columnSignal && (
-          <div className="border-t pt-2 mt-2">
-            <div className="font-medium">Column Mapping: {log.columnSignal.points} pts</div>
-            {log.columnSignal.matchedHeaders.length > 0 && (
-              <div className="text-xs mt-1">
-                Matched: {log.columnSignal.matchedHeaders.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {log.weightSignal && (
-          <div className="border-t pt-2 mt-2">
-            <div className="font-medium">Weight Range: {log.weightSignal.found ? '20' : '0'} pts</div>
-            {log.weightSignal.samples.length > 0 && (
-              <div className="text-xs mt-1">
-                Samples: {log.weightSignal.samples.slice(0, 2).join(', ')}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
   
   const handleSkipMapping = (sheetName: string) => {
     setParsedSheets(parsedSheets.map(sheet => {
@@ -228,45 +181,7 @@ export const ParsePreviewStep = () => {
       title: 'Sheet Name',
       dataIndex: 'sheetName',
       key: 'sheetName',
-      render: (name: string, record: ParsedSheetData) => (
-        <Space>
-          {name}
-          {record.detectionLog && (
-            <Popover
-              content={renderDetectionDetails(record)}
-              title="Detection Details"
-              trigger="click"
-            >
-              <InfoCircleOutlined className="cursor-pointer text-primary" />
-            </Popover>
-          )}
-        </Space>
-      )
-    },
-    {
-      title: 'Verdict',
-      dataIndex: 'detectionVerdict',
-      key: 'detectionVerdict',
-      render: (verdict: string, record: ParsedSheetData) => {
-        const colorMap = { rate: 'green', uncertain: 'orange', skipped: 'default' };
-        return (
-          <Space>
-            <Tag color={colorMap[verdict as keyof typeof colorMap] || 'default'}>
-              {verdict || 'N/A'}
-            </Tag>
-            {record.needsMapping && editingSheet !== record.sheetName && (
-              <Button size="small" type="link" onClick={() => setMappingSheet(record)}>
-                Map Columns
-              </Button>
-            )}
-            {verdict === 'uncertain' && !record.needsMapping && editingSheet !== record.sheetName && (
-              <Button size="small" type="link" onClick={() => setEditingSheet(record.sheetName)}>
-                Annotate
-              </Button>
-            )}
-          </Space>
-        );
-      }
+      render: (name: string) => name
     },
     {
       title: 'Type',
@@ -283,22 +198,6 @@ export const ParsePreviewStep = () => {
       render: (code: string) => code || '-'
     },
     {
-      title: 'Score',
-      dataIndex: 'detectionScore',
-      key: 'detectionScore',
-      render: (score: number) => score !== undefined ? score : '-'
-    },
-    {
-      title: 'Confidence',
-      dataIndex: 'confidence',
-      key: 'confidence',
-      render: (confidence: number, record: ParsedSheetData) => {
-        if (confidence === undefined) return '-';
-        const color = confidence >= 70 ? 'green' : confidence >= 50 ? 'orange' : 'red';
-        return <Tag color={color}>{confidence}%</Tag>;
-      }
-    },
-    {
       title: 'Version',
       dataIndex: 'isFirstVersion',
       key: 'isFirstVersion',
@@ -309,19 +208,46 @@ export const ParsePreviewStep = () => {
       )
     },
     {
-      title: 'Rows',
-      dataIndex: 'rows',
-      key: 'rows',
-      render: (rows: any[]) => rows.length
-    },
-    {
       title: 'Details',
       key: 'details',
       render: (_: any, record: ParsedSheetData) => {
-        if (record.rateCardDetails && record.rateCardDetails.length > 0) {
-          return (
+        const rateCount = record.rateCardDetails?.length || 0;
+        const rowCount = record.rows?.length || 0;
+        return (
+          <Popover
+            content={
+              <div className="space-y-2 text-sm">
+                <div>Raw Rows: {rowCount}</div>
+                <div>Rate Items: {rateCount}</div>
+                {record.effectiveDate && <div>Effective Date: {record.effectiveDate}</div>}
+                {record.notes && <div>Notes: {record.notes.substring(0, 100)}...</div>}
+              </div>
+            }
+            title="Sheet Details"
+            trigger="click"
+          >
             <Button size="small" type="link">
-              View ({record.rateCardDetails.length} rows)
+              View Details
+            </Button>
+          </Popover>
+        );
+      }
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_: any, record: ParsedSheetData) => {
+        if (record.needsMapping && editingSheet !== record.sheetName) {
+          return (
+            <Button size="small" type="link" onClick={() => setMappingSheet(record)}>
+              Map Columns
+            </Button>
+          );
+        }
+        if (record.detectionVerdict === 'uncertain' && !record.needsMapping && editingSheet !== record.sheetName) {
+          return (
+            <Button size="small" type="link" onClick={() => setEditingSheet(record.sheetName)}>
+              Annotate
             </Button>
           );
         }
@@ -342,21 +268,10 @@ export const ParsePreviewStep = () => {
       return;
     }
     
-    // Check if all sheets are first versions
-    const rateSheets = parsedSheets.filter(s => s.detectionVerdict !== 'skipped');
-    const allFirstVersions = rateSheets.every(s => s.isFirstVersion);
-    
-    if (allFirstVersions) {
-      // Skip validation and confirmation steps, go directly to import
-      setCurrentStep(4);
-    } else {
-      // Go to validation step
-      setCurrentStep(2);
-    }
+    // Go directly to import step (step 2 now, since we removed validation and confirm steps)
+    setCurrentStep(2);
   };
 
-  const rateSheets = parsedSheets.filter(s => s.detectionVerdict !== 'skipped');
-  const allFirstVersions = rateSheets.every(s => s.isFirstVersion);
   const skippedCount = parsedSheets.filter(s => s.detectionVerdict === 'skipped').length;
   const needsMappingCount = parsedSheets.filter(s => s.needsMapping).length;
   
@@ -389,14 +304,6 @@ export const ParsePreviewStep = () => {
         />
       )}
       
-      {allFirstVersions && rateSheets.length > 0 && (
-        <Alert
-          message={t('import.preview.allFirstVersions')}
-          description="This is the first import for all rate card channels. Structure validation will be skipped."
-          type="info"
-          showIcon
-        />
-      )}
       
       {skippedCount > 0 && (
         <Alert
