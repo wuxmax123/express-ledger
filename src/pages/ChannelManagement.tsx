@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Package, Calculator, Upload, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { ChannelFormDialog } from '@/components/channels/ChannelFormDialog';
 import { WeightCalculator } from '@/components/channels/WeightCalculator';
@@ -34,6 +35,7 @@ interface ShippingChannel {
   max_single_side: number | null;
   dimension_limit_notes: string | null;
   conditional_rules: any | null;
+  is_active: boolean;
 }
 
 const ChannelManagement = () => {
@@ -96,6 +98,23 @@ const ChannelManagement = () => {
     },
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: number; is_active: boolean }) => {
+      const { error } = await supabase
+        .from('shipping_channels')
+        .update({ is_active })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipping-channels'] });
+      toast.success('状态已更新');
+    },
+    onError: (error) => {
+      toast.error('更新失败: ' + error.message);
+    },
+  });
+
   const handleAdd = () => {
     setEditingChannel(null);
     setIsFormDialogOpen(true);
@@ -141,6 +160,7 @@ const ChannelManagement = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>状态</TableHead>
                 <TableHead>渠道代码</TableHead>
                 <TableHead>渠道名称</TableHead>
                 <TableHead>服务类型</TableHead>
@@ -153,19 +173,25 @@ const ChannelManagement = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     加载中...
                   </TableCell>
                 </TableRow>
               ) : channels?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     暂无渠道数据
                   </TableCell>
                 </TableRow>
               ) : (
                 channels?.map((channel) => (
-                  <TableRow key={channel.id}>
+                  <TableRow key={channel.id} className={channel.is_active ? '' : 'opacity-50'}>
+                    <TableCell>
+                      <Switch
+                        checked={channel.is_active}
+                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: channel.id, is_active: checked })}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{channel.channel_code}</Badge>
                     </TableCell>
