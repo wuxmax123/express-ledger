@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -271,23 +272,21 @@ const ChannelManagement = () => {
         onOpenChange={setIsBulkImportOpen}
       />
 
-      {testingChannel && (
-        <div className="mt-6">
-          <WeightCalculator
-            channelId={testingChannel.id}
-            channelCode={testingChannel.channel_code}
-            conditionalRules={testingChannel.conditional_rules}
-            volumeWeightDivisor={testingChannel.volume_weight_divisor}
-          />
-          <Button
-            variant="outline"
-            onClick={() => setTestingChannel(null)}
-            className="mt-4"
-          >
-            关闭测试
-          </Button>
-        </div>
-      )}
+      <Dialog open={!!testingChannel} onOpenChange={(open) => !open && setTestingChannel(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>重量计算测试 - {testingChannel?.channel_code}</DialogTitle>
+          </DialogHeader>
+          {testingChannel && (
+            <WeightCalculator
+              channelId={testingChannel.id}
+              channelCode={testingChannel.channel_code}
+              conditionalRules={testingChannel.conditional_rules}
+              volumeWeightDivisor={testingChannel.volume_weight_divisor}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
