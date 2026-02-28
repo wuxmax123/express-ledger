@@ -190,6 +190,7 @@ export type Database = {
           currency: string | null
           dimension_limit_notes: string | null
           id: number
+          is_active: boolean
           max_height: number | null
           max_length: number | null
           max_single_side: number | null
@@ -209,6 +210,7 @@ export type Database = {
           currency?: string | null
           dimension_limit_notes?: string | null
           id?: number
+          is_active?: boolean
           max_height?: number | null
           max_length?: number | null
           max_single_side?: number | null
@@ -228,6 +230,7 @@ export type Database = {
           currency?: string | null
           dimension_limit_notes?: string | null
           id?: number
+          is_active?: boolean
           max_height?: number | null
           max_length?: number | null
           max_single_side?: number | null
